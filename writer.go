@@ -51,6 +51,8 @@ func Write(w io.Writer, in interface{}) error {
 		return writeMap(w, rv)
 	case reflect.Struct:
 		return writeStruct(w, rv)
+	case reflect.Pointer:
+		return Write(w, rv.Elem().Interface())
 	}
 
 	return fmt.Errorf("type %s not supportable", rv.Type())
