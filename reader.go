@@ -1,50 +1,67 @@
 package muon
 
 import (
+	"bufio"
+	"github.com/go-interpreter/wagon/wasm/leb128"
 	"io"
 )
 
 type Reader struct {
-	in    []byte
-	scanp int
+	b *bufio.Reader
 }
 
-type Token struct {
-	A    TokenEnum
-	Data interface{}
-}
-
-func NewByteReader(in []byte) Reader {
-	return Reader{in: in}
+func NewReader(r io.Reader) Reader {
+	return Reader{
+		b: bufio.NewReader(r),
+	}
 }
 
 func (r *Reader) Next() (Token, error) {
-	if r.scanp >= len(r.in) {
-		return Token{}, io.EOF
+	first, err := r.b.ReadByte()
+	if err != nil {
+		return Token{}, err
 	}
-
-	first := r.in[r.scanp]
-
-	r.scanp += 1
 
 	if token, ok := tokenMapping[first]; ok {
 		return Token{A: token}, nil
 	}
 
 	if first >= 0xA0 && first <= 0xA0+9 {
-		return Token{A: tokenInt, Data: int(first - 0xA0)}, nil
+		return Token{A: TokenNumber, Data: int(first - 0xA0)}, nil
 	}
 
-	// strings
-	from := r.scanp - 1
-	to := r.scanp
-	for ; to < len(r.in); to++ {
-		if r.in[to] == stringEnd {
-			r.scanp = to + 1
+	if first == stringEnd {
+		return Token{A: TokenString, Data: ""}, nil
+	}
 
-			return Token{A: TokenString, Data: string(r.in[from:to])}, nil
+	if first == stringStart {
+		size, err := r.readCount()
+		if err != nil {
+			return Token{}, err
 		}
+
+		buf := make([]byte, size)
+		if _, err := r.b.Read(buf); err != nil {
+			return Token{}, err
+		}
+
+		return Token{A: TokenString, Data: string(buf)}, nil
 	}
 
-	return Token{}, io.EOF
+	if err := r.b.UnreadByte(); err != nil {
+		return Token{}, err
+	}
+
+	str, err := r.b.ReadString(stringEnd)
+	if err != nil {
+		return Token{}, err
+	}
+
+	return Token{A: TokenString, Data: str[:len(str)-1]}, nil
+}
+
+func (r Reader) readCount() (int, error) {
+	v, err := leb128.ReadVarint64(r.b)
+
+	return int(v), err
 }

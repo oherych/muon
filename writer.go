@@ -1,13 +1,13 @@
 package muon
 
 import (
+	"bufio"
 	"fmt"
+	"github.com/go-interpreter/wagon/wasm/leb128"
 	"io"
 	"math"
 	"reflect"
 	"strings"
-
-	"ekyu.moe/leb128"
 )
 
 const (
@@ -16,153 +16,202 @@ const (
 
 var (
 	kindToType = map[reflect.Kind]byte{
-		reflect.Int:     0,
-		reflect.Int8:    0,
-		reflect.Int16:   0,
-		reflect.Int32:   0,
-		reflect.Int64:   0,
-		reflect.Uint:    0,
-		reflect.Uint8:   0,
-		reflect.Uint16:  0,
-		reflect.Uint32:  0,
-		reflect.Uint64:  0,
-		reflect.Uintptr: 0,
-		reflect.Float32: 0,
-		reflect.Float64: 0,
+		reflect.Int:     0, // TODO:
+		reflect.Int8:    typeInt8,
+		reflect.Int16:   typeInt16,
+		reflect.Int32:   typeInt32,
+		reflect.Int64:   typeInt64,
+		reflect.Uint:    0, // TODO:
+		reflect.Uint8:   typeUint8,
+		reflect.Uint16:  typeUint16,
+		reflect.Uint32:  typeUint32,
+		reflect.Uint64:  typeUint64,
+		reflect.Float32: typeFloat32,
+		reflect.Float64: typeFloat64,
 	}
 )
 
-type Encoder struct{}
-
-func (e Encoder) Write(w io.Writer, in interface{}) error {
-	return e.write(w, in)
+type Encoder struct {
+	b *bufio.Writer
 }
 
-func (e Encoder) write(w io.Writer, in interface{}) error {
+func NewEncoder(w io.Writer) Encoder {
+	return Encoder{
+		b: bufio.NewWriter(w),
+	}
+}
+
+func (e Encoder) Write(in interface{}) error {
+	if err := e.write(in); err != nil {
+		return err
+	}
+
+	return e.b.Flush()
+}
+
+func (e Encoder) write(in interface{}) error {
 	if m, ok := in.(Marshaler); ok {
 		data, err := m.MarshalMuon()
 		if err != nil {
 			return err
 		}
 
-		return e.writeBytes(w, data)
+		return e.writeBytes(data)
 	}
 
 	if m, ok := in.(MarshalerStream); ok {
-		return m.MarshalMuon(w)
+		return m.MarshalMuon(e.b)
 	}
 
 	if in == nil {
-		return e.writeByte(w, nilValue)
+		return e.writeByte(nilValue)
 	}
 
 	rv := reflect.ValueOf(in)
 	kind := rv.Kind()
 
 	if kind == reflect.Bool {
-		return e.writeBool(w, rv.Bool())
+		return e.writeBool(rv.Bool())
 	}
 
 	if kind == reflect.String {
-		return e.writeString(w, rv.String())
+		return e.writeString(rv.String())
 	}
 
 	if kind >= reflect.Int && kind <= reflect.Int64 {
-		return e.writeInteger(w, rv)
+		return e.writeInteger(rv)
 	}
 
 	if kind >= reflect.Uint && kind <= reflect.Uint64 {
-		return e.writeUint(w, rv)
+		return e.writeUint(rv)
 	}
 
 	if kind == reflect.Float32 || kind == reflect.Float64 {
-		return e.writeFloat(w, rv)
+		return e.writeFloat(rv)
 	}
 
 	if kind == reflect.Slice || kind == reflect.Array {
-		return e.writeList(w, rv)
+		return e.writeList(rv)
 	}
 
 	if kind == reflect.Map {
-		return e.writeMap(w, rv)
+		return e.writeMap(rv)
 	}
 
 	if kind == reflect.Struct {
-		return e.writeStruct(w, rv)
+		return e.writeStruct(rv)
 	}
 
 	if kind == reflect.Pointer {
-		return e.write(w, rv.Elem().Interface())
+		return e.write(rv.Elem().Interface())
 	}
 
 	return fmt.Errorf("type %s not supportable", rv.Type())
 }
 
-func (e Encoder) writeBool(w io.Writer, v bool) error {
+func (e Encoder) writeBool(v bool) error {
 	if v {
-		return e.writeByte(w, boolTrue)
+		return e.writeByte(boolTrue)
 	}
 
-	return e.writeByte(w, boolFalse)
+	return e.writeByte(boolFalse)
 }
 
-func (e Encoder) writeInteger(w io.Writer, rv reflect.Value) error {
+func (e Encoder) writeInteger(rv reflect.Value) error {
 	v := rv.Int()
 	if v >= 0 && v <= 9 {
-		return e.writeBytes(w, []byte{0xA0 + byte(v)})
+		return e.writeByte(0xA0 + byte(v))
 	}
 
-	return e.writeBytes(w, []byte{0xBB}, leb128.AppendSleb128(nil, v))
+	tb, ok := kindToType[rv.Kind()]
+	if !ok {
+		panic("TODO")
+	}
+
+	if err := e.writeByte(tb); err != nil {
+		return err
+	}
+
+	_, err := leb128.WriteVarint64(e.b, v)
+
+	return err
 }
 
-func (e Encoder) writeUint(w io.Writer, rv reflect.Value) error {
+func (e Encoder) writeUint(rv reflect.Value) error {
 	v := rv.Uint()
 	if v >= 0 && v <= 9 {
-		return e.writeBytes(w, []byte{0xA0 + byte(v)})
+		return e.writeByte(0xA0 + byte(v))
 	}
 
-	return e.writeBytes(w, []byte{0xBB}, leb128.AppendUleb128(nil, v))
+	tb, ok := kindToType[rv.Kind()]
+	if !ok {
+		panic("TODO")
+	}
+
+	if err := e.writeByte(tb); err != nil {
+		return err
+	}
+
+	return e.writeBytes(leb128.AppendUleb128(nil, v))
 }
 
-func (e Encoder) writeFloat(w io.Writer, rv reflect.Value) error {
+func (e Encoder) writeFloat(rv reflect.Value) error {
 	v := rv.Float()
 
 	if math.IsNaN(v) {
-		return e.writeByte(w, nanValue)
+		return e.writeByte(nanValue)
 	}
 	if math.IsInf(v, -1) {
-		return e.writeByte(w, negativeInfValue)
+		return e.writeByte(negativeInfValue)
 	}
 	if math.IsInf(v, 1) {
-		return e.writeByte(w, positiveInfValue)
+		return e.writeByte(positiveInfValue)
 	}
 
 	panic("implement me")
 }
 
-func (e Encoder) writeString(w io.Writer, v string) error {
+func (e Encoder) writeString(v string) error {
 	// must be encoded as fixed-length if:
 	// longer than `longStringFactor` bytes, or contains any 0x00 bytes
 	if len(v) > longStringFactor || strings.ContainsRune(v, stringEnd) {
-		return e.writeBytes(w, []byte{stringStart}, []byte(v))
+		if err := e.writeByte(stringStart); err != nil {
+			return err
+		}
+
+		if err := e.writeCount(len(v)); err != nil {
+			return err
+		}
+
+		return e.writeBytes([]byte(v))
 	}
 
 	// TODO: with ref ID
 
-	return e.writeBytes(w, []byte(v), []byte{stringEnd})
+	return e.writeBytes([]byte(v), []byte{stringEnd})
+}
+
+func (e Encoder) writeCount(v int) error {
+	_, err := leb128.WriteVarint64(e.b, int64(v))
+
+	return err
 }
 
 // TODO
 
-func (e Encoder) writeList(w io.Writer, rv reflect.Value) error {
-	kind := rv.Kind()
+func (e Encoder) writeList(rv reflect.Value) error {
+	kind := rv.Type().Elem().Kind()
 
 	if tb, ok := kindToType[kind]; ok {
-		if err := e.writeBytes(w, []byte{typedArray, tb}); err != nil {
+		if err := e.writeByte(typedArray); err != nil {
 			return err
 		}
 
-		if err := e.write(w, rv.Len()); err != nil {
+		if err := e.writeByte(tb); err != nil {
+			return err
+		}
+
+		if err := e.writeCount(rv.Len()); err != nil {
 			return err
 		}
 
@@ -171,25 +220,25 @@ func (e Encoder) writeList(w io.Writer, rv reflect.Value) error {
 		return nil
 	}
 
-	if err := e.writeByte(w, listStart); err != nil {
+	if err := e.writeByte(listStart); err != nil {
 		return err
 	}
 
 	for i := 0; i < rv.Len(); i++ {
-		if err := e.write(w, rv.Index(i).Interface()); err != nil {
+		if err := e.write(rv.Index(i).Interface()); err != nil {
 			return err
 		}
 	}
 
-	if err := e.writeByte(w, listEnd); err != nil {
+	if err := e.writeByte(listEnd); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (e Encoder) writeMap(w io.Writer, rv reflect.Value) error {
-	if err := e.writeBytes(w, []byte{dictStart}); err != nil {
+func (e Encoder) writeMap(rv reflect.Value) error {
+	if err := e.writeByte(dictStart); err != nil {
 		return err
 	}
 
@@ -197,24 +246,24 @@ func (e Encoder) writeMap(w io.Writer, rv reflect.Value) error {
 		iv := rv.MapIndex(k)
 		// TODO: type validation
 
-		if err := e.write(w, iv.Interface()); err != nil {
+		if err := e.write(k.Interface()); err != nil {
 			return err
 		}
 
-		if err := e.write(w, k.Interface()); err != nil {
+		if err := e.write(iv.Interface()); err != nil {
 			return err
 		}
 	}
 
-	if err := e.writeBytes(w, []byte{dictEnd}); err != nil {
+	if err := e.writeByte(dictEnd); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (e Encoder) writeStruct(w io.Writer, rv reflect.Value) error {
-	if err := e.writeBytes(w, []byte{dictStart}); err != nil {
+func (e Encoder) writeStruct(rv reflect.Value) error {
+	if err := e.writeByte(dictStart); err != nil {
 		return err
 	}
 
@@ -224,25 +273,25 @@ func (e Encoder) writeStruct(w io.Writer, rv reflect.Value) error {
 		tf := tt.Field(i)
 		vf := rv.Field(i)
 
-		if err := e.writeString(w, tf.Name); err != nil {
+		if err := e.writeString(tf.Name); err != nil {
 			return err
 		}
 
-		if err := e.write(w, vf.Interface()); err != nil {
+		if err := e.write(vf.Interface()); err != nil {
 			return err
 		}
 	}
 
-	if err := e.writeBytes(w, []byte{dictEnd}); err != nil {
+	if err := e.writeByte(dictEnd); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (Encoder) writeBytes(w io.Writer, val ...[]byte) error {
+func (e Encoder) writeBytes(val ...[]byte) error {
 	for _, v := range val {
-		if _, err := w.Write(v); err != nil {
+		if _, err := e.b.Write(v); err != nil {
 			return err
 		}
 	}
@@ -250,7 +299,6 @@ func (Encoder) writeBytes(w io.Writer, val ...[]byte) error {
 	return nil
 }
 
-func (Encoder) writeByte(w io.Writer, val byte) error {
-	_, err := w.Write([]byte{val})
-	return err
+func (e Encoder) writeByte(val byte) error {
+	return e.b.WriteByte(val)
 }

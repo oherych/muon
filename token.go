@@ -9,7 +9,7 @@ const (
 	tokenListEnd   TokenEnum = "list_end"
 	tokenDictStart TokenEnum = "dict_start"
 	tokenDictEnd   TokenEnum = "dict_end"
-	tokenInt       TokenEnum = "int"
+	TokenNumber    TokenEnum = "number"
 )
 
 var (
@@ -25,3 +25,8 @@ var (
 )
 
 type TokenEnum string
+
+type Token struct {
+	A    TokenEnum
+	Data interface{}
+}
