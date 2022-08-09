@@ -126,7 +126,7 @@ func (e Encoder) writeInteger(rv reflect.Value, raw interface{}) error {
 
 func (e Encoder) writeUint(rv reflect.Value, raw interface{}) error {
 	v := rv.Uint()
-	if v >= 0 && v <= 9 {
+	if v <= 9 {
 		return e.writeByte(zeroNumber + byte(v))
 	}
 
