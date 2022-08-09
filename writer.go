@@ -134,7 +134,7 @@ func (e Encoder) writeUint(rv reflect.Value, raw interface{}) error {
 		return err
 	}
 
-	if rv.Kind() == reflect.Int {
+	if rv.Kind() == reflect.Uint {
 		raw = v
 	}
 
@@ -217,7 +217,17 @@ func (e Encoder) writeList(rv reflect.Value) error {
 		}
 
 		for i := 0; i < rv.Len(); i++ {
-			if err := e.writeLittleEndian(rv.Index(i).Interface()); err != nil {
+			var v interface{}
+			switch kind {
+			case reflect.Int:
+				v = rv.Index(i).Int()
+			case reflect.Uint:
+				v = rv.Index(i).Uint()
+			default:
+				v = rv.Index(i).Interface()
+			}
+
+			if err := e.writeLittleEndian(v); err != nil {
 				return err
 			}
 		}

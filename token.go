@@ -1,15 +1,16 @@
 package muon
 
 const (
-	TokenString    TokenEnum = "string"
-	tokenNil       TokenEnum = "nil"
-	tokenFalse     TokenEnum = "false"
-	tokenTrue      TokenEnum = "true"
-	tokenListStart TokenEnum = "list_start"
-	tokenListEnd   TokenEnum = "list_end"
-	tokenDictStart TokenEnum = "dict_start"
-	tokenDictEnd   TokenEnum = "dict_end"
-	TokenNumber    TokenEnum = "number"
+	TokenString     TokenEnum = "string"
+	tokenNil        TokenEnum = "nil"
+	tokenFalse      TokenEnum = "false"
+	tokenTrue       TokenEnum = "true"
+	tokenListStart  TokenEnum = "list_start"
+	tokenListEnd    TokenEnum = "list_end"
+	tokenDictStart  TokenEnum = "dict_start"
+	tokenDictEnd    TokenEnum = "dict_end"
+	TokenNumber     TokenEnum = "number"
+	TokenTypedArray TokenEnum = "typed_array"
 )
 
 var (
@@ -27,6 +28,6 @@ var (
 type TokenEnum string
 
 type Token struct {
-	A    TokenEnum
-	Data interface{}
+	A TokenEnum
+	D interface{}
 }

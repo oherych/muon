@@ -29,7 +29,7 @@ func (r *Decoder) Next() (Token, error) {
 	}
 
 	if r.inRange(first, zeroNumber, zeroNumber+9) {
-		return Token{A: TokenNumber, Data: int(first - zeroNumber)}, nil
+		return Token{A: TokenNumber, D: int(first - zeroNumber)}, nil
 	}
 
 	if r.inRange(first, typeInt8, typeFloat64) {
@@ -44,7 +44,33 @@ func (r *Decoder) Next() (Token, error) {
 			return Token{}, err
 		}
 
-		return Token{A: TokenNumber, Data: rv.Elem().Interface()}, nil
+		return Token{A: TokenNumber, D: rv.Elem().Interface()}, nil
+	}
+
+	if first == typedArray {
+		tb, err := r.b.ReadByte()
+		if err != nil {
+			return Token{}, err
+		}
+
+		t, ok := muonTypeToType[tb]
+		if !ok {
+			panic("sd")
+		}
+
+		size, err := r.readCount()
+		if err != nil {
+			return Token{}, err
+		}
+
+		rv := reflect.MakeSlice(reflect.SliceOf(t), size, size)
+
+		target := rv.Interface()
+		if err := binary.Read(r.b, binary.LittleEndian, target); err != nil {
+			return Token{}, err
+		}
+
+		return Token{A: TokenTypedArray, D: rv.Interface()}, nil
 	}
 
 	if first == stringStart {
@@ -58,11 +84,11 @@ func (r *Decoder) Next() (Token, error) {
 			return Token{}, err
 		}
 
-		return Token{A: TokenString, Data: string(buf)}, nil
+		return Token{A: TokenString, D: string(buf)}, nil
 	}
 
 	if first == stringEnd {
-		return Token{A: TokenString, Data: ""}, nil
+		return Token{A: TokenString, D: ""}, nil
 	}
 
 	if err := r.b.UnreadByte(); err != nil {
@@ -74,7 +100,7 @@ func (r *Decoder) Next() (Token, error) {
 		return Token{}, err
 	}
 
-	return Token{A: TokenString, Data: str[:len(str)-1]}, nil
+	return Token{A: TokenString, D: str[:len(str)-1]}, nil
 }
 
 func (Decoder) inRange(v, a, b byte) bool {
