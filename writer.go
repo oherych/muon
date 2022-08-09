@@ -88,7 +88,7 @@ func (e Encoder) write(in interface{}) error {
 		return e.writeStruct(rv)
 	}
 
-	if kind == reflect.Pointer {
+	if kind == reflect.Ptr {
 		return e.write(rv.Elem().Interface())
 	}
 
