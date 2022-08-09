@@ -1,5 +1,7 @@
 package muon
 
+import "math"
+
 const (
 	TokenString     TokenEnum = "string"
 	tokenNil        TokenEnum = "nil"
@@ -14,14 +16,17 @@ const (
 )
 
 var (
-	tokenMapping = map[byte]TokenEnum{
-		listStart: tokenListStart,
-		listEnd:   tokenListEnd,
-		dictStart: tokenDictStart,
-		dictEnd:   tokenDictEnd,
-		boolFalse: tokenFalse,
-		boolTrue:  tokenTrue,
-		nilValue:  tokenNil,
+	tokenMapping = map[byte]Token{
+		listStart:        {A: tokenListStart},
+		listEnd:          {A: tokenListEnd},
+		dictStart:        {A: tokenDictStart},
+		dictEnd:          {A: tokenDictEnd},
+		boolFalse:        {A: tokenFalse},
+		boolTrue:         {A: tokenTrue},
+		nilValue:         {A: tokenNil},
+		nanValue:         {A: TokenNumber, D: math.NaN()},
+		negativeInfValue: {A: TokenNumber, D: math.Inf(-1)},
+		positiveInfValue: {A: TokenNumber, D: math.Inf(1)},
 	}
 )
 

@@ -10,6 +10,10 @@ import (
 func TestNewReader(t *testing.T) {
 	for testCase, tt := range tests {
 		t.Run(testCase, func(t *testing.T) {
+			if tt.skipReading {
+				t.SkipNow()
+			}
+
 			dr := bytes.NewReader(tt.encoded)
 			decoder := NewDecoder(dr)
 

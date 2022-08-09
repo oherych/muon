@@ -25,7 +25,7 @@ func (r *Decoder) Next() (Token, error) {
 	}
 
 	if token, ok := tokenMapping[first]; ok {
-		return Token{A: token}, nil
+		return token, nil
 	}
 
 	if r.inRange(first, zeroNumber, zeroNumber+9) {

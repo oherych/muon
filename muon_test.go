@@ -1,5 +1,7 @@
 package muon
 
+import "math"
+
 type G string
 
 var (
@@ -7,9 +9,10 @@ var (
 	testLongString = "test Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce mi mauris, fringilla a gravida ac, vulputate vitae dui. Proin rhoncus ante vitae purus mollis, id hendrerit tellus tempor. Aliquam ut ex nibh. Aenean quis quam eu purus scelerisque viverra ac consequat justo. Sed lobortis interdum facilisis. Sed euismod est magna, at iaculis nisi mollis a. Maecenas nec diam augue. Phasellus volutpat mattis nisi, eu sagittis enim tempor vitae. Aliquam sit amet ante finibus, bibendum lorem et, porta libero. Sed eu."
 
 	tests = map[string]struct {
-		golang  interface{}
-		encoded []byte
-		tokens  []Token
+		golang      interface{}
+		encoded     []byte
+		tokens      []Token
+		skipReading bool
 	}{
 		"nil": {
 			golang:  nil,
@@ -159,6 +162,23 @@ var (
 			golang:  float64(-64.5),
 			encoded: []byte{typeFloat64, 0x0, 0x0, 0x0, 0x0, 0x0, 0x20, 0x50, 0xc0},
 			tokens:  []Token{{A: TokenNumber, D: float64(-64.5)}},
+		},
+
+		"flot_nan": {
+			golang:      math.NaN(),
+			encoded:     []byte{nanValue},
+			tokens:      []Token{{A: TokenNumber, D: math.NaN()}},
+			skipReading: true,
+		},
+		"flot_+Inf": {
+			golang:  math.Inf(-1),
+			encoded: []byte{negativeInfValue},
+			tokens:  []Token{{A: TokenNumber, D: math.Inf(-1)}},
+		},
+		"flot_-Inf": {
+			golang:  math.Inf(1),
+			encoded: []byte{positiveInfValue},
+			tokens:  []Token{{A: TokenNumber, D: math.Inf(1)}},
 		},
 
 		"slice": {
