@@ -2,33 +2,19 @@ package muon
 
 import (
 	"bufio"
+	"encoding/binary"
+	"errors"
 	"fmt"
-	"github.com/go-interpreter/wagon/wasm/leb128"
 	"io"
 	"math"
 	"reflect"
 	"strings"
+
+	"github.com/go-interpreter/wagon/wasm/leb128"
 )
 
 const (
 	longStringFactor = 512
-)
-
-var (
-	kindToType = map[reflect.Kind]byte{
-		reflect.Int:     0, // TODO:
-		reflect.Int8:    typeInt8,
-		reflect.Int16:   typeInt16,
-		reflect.Int32:   typeInt32,
-		reflect.Int64:   typeInt64,
-		reflect.Uint:    0, // TODO:
-		reflect.Uint8:   typeUint8,
-		reflect.Uint16:  typeUint16,
-		reflect.Uint32:  typeUint32,
-		reflect.Uint64:  typeUint64,
-		reflect.Float32: typeFloat32,
-		reflect.Float64: typeFloat64,
-	}
 )
 
 type Encoder struct {
@@ -79,15 +65,15 @@ func (e Encoder) write(in interface{}) error {
 	}
 
 	if kind >= reflect.Int && kind <= reflect.Int64 {
-		return e.writeInteger(rv)
+		return e.writeInteger(rv, in)
 	}
 
 	if kind >= reflect.Uint && kind <= reflect.Uint64 {
-		return e.writeUint(rv)
+		return e.writeUint(rv, in)
 	}
 
 	if kind == reflect.Float32 || kind == reflect.Float64 {
-		return e.writeFloat(rv)
+		return e.writeFloat(rv, in)
 	}
 
 	if kind == reflect.Slice || kind == reflect.Array {
@@ -117,45 +103,47 @@ func (e Encoder) writeBool(v bool) error {
 	return e.writeByte(boolFalse)
 }
 
-func (e Encoder) writeInteger(rv reflect.Value) error {
+func (e Encoder) writeInteger(rv reflect.Value, raw interface{}) error {
 	v := rv.Int()
 	if v >= 0 && v <= 9 {
-		return e.writeByte(0xA0 + byte(v))
+		return e.writeByte(zeroNumber + byte(v))
 	}
 
-	tb, ok := kindToType[rv.Kind()]
-	if !ok {
-		panic("TODO")
-	}
-
-	if err := e.writeByte(tb); err != nil {
+	if err := e.writeTyped(rv.Kind()); err != nil {
 		return err
 	}
 
-	_, err := leb128.WriteVarint64(e.b, v)
+	if rv.Kind() == reflect.Int {
+		raw = v
+	}
 
-	return err
+	return e.writeLittleEndian(raw)
+
+	//_, err := leb128.WriteVarint64(e.b, v)
+	//
+	//return err
 }
 
-func (e Encoder) writeUint(rv reflect.Value) error {
+func (e Encoder) writeUint(rv reflect.Value, raw interface{}) error {
 	v := rv.Uint()
 	if v >= 0 && v <= 9 {
-		return e.writeByte(0xA0 + byte(v))
+		return e.writeByte(zeroNumber + byte(v))
 	}
 
-	tb, ok := kindToType[rv.Kind()]
-	if !ok {
-		panic("TODO")
-	}
-
-	if err := e.writeByte(tb); err != nil {
+	if err := e.writeTyped(rv.Kind()); err != nil {
 		return err
 	}
 
-	return e.writeBytes(leb128.AppendUleb128(nil, v))
+	if rv.Kind() == reflect.Int {
+		raw = v
+	}
+
+	return e.writeLittleEndian(raw)
+
+	//return e.writeBytes(leb128.AppendUleb128(nil, v))
 }
 
-func (e Encoder) writeFloat(rv reflect.Value) error {
+func (e Encoder) writeFloat(rv reflect.Value, raw interface{}) error {
 	v := rv.Float()
 
 	if math.IsNaN(v) {
@@ -168,7 +156,11 @@ func (e Encoder) writeFloat(rv reflect.Value) error {
 		return e.writeByte(positiveInfValue)
 	}
 
-	panic("implement me")
+	if err := e.writeTyped(rv.Kind()); err != nil {
+		return err
+	}
+
+	return e.writeLittleEndian(raw)
 }
 
 func (e Encoder) writeString(v string) error {
@@ -192,17 +184,26 @@ func (e Encoder) writeString(v string) error {
 }
 
 func (e Encoder) writeCount(v int) error {
-	_, err := leb128.WriteVarint64(e.b, int64(v))
-
-	return err
+	return e.writeBytes(leb128.AppendUleb128(nil, uint64(v)))
 }
 
-// TODO
+func (e Encoder) writeTyped(k reflect.Kind) error {
+	tb, ok := kindToMuonType[k]
+	if !ok {
+		return errors.New("unexpected error: cannot find type in kindToMuonType map")
+	}
+
+	return e.writeByte(tb)
+}
+
+func (e Encoder) writeLittleEndian(in interface{}) error {
+	return binary.Write(e.b, binary.LittleEndian, in)
+}
 
 func (e Encoder) writeList(rv reflect.Value) error {
 	kind := rv.Type().Elem().Kind()
 
-	if tb, ok := kindToType[kind]; ok {
+	if tb, ok := kindToMuonType[kind]; ok {
 		if err := e.writeByte(typedArray); err != nil {
 			return err
 		}
@@ -215,7 +216,11 @@ func (e Encoder) writeList(rv reflect.Value) error {
 			return err
 		}
 
-		// TODO: implement me
+		for i := 0; i < rv.Len(); i++ {
+			if err := e.writeLittleEndian(rv.Index(i).Interface()); err != nil {
+				return err
+			}
+		}
 
 		return nil
 	}
@@ -243,6 +248,10 @@ func (e Encoder) writeMap(rv reflect.Value) error {
 	}
 
 	for _, k := range rv.MapKeys() {
+		if k.Kind() != reflect.String && kindToMuonType[k.Kind()] == 0 {
+			return errors.New("wrong type of dict key")
+		}
+
 		iv := rv.MapIndex(k)
 		// TODO: type validation
 

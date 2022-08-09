@@ -11,13 +11,16 @@ func TestNewReader(t *testing.T) {
 	for testCase, tt := range tests {
 		t.Run(testCase, func(t *testing.T) {
 			dr := bytes.NewReader(tt.encoded)
-			r := NewReader(dr)
+			decoder := NewDecoder(dr)
 
 			result := make([]Token, 0)
 			for {
-				token, err := r.Next()
+				token, err := decoder.Next()
 				if err == io.EOF {
 					break
+				}
+				if err != nil {
+					t.Fatal(err)
 				}
 
 				result = append(result, token)
@@ -26,5 +29,28 @@ func TestNewReader(t *testing.T) {
 			assert.Equal(t, tt.tokens, result)
 		})
 	}
+}
 
+func BenchmarkDecoder(b *testing.B) {
+	for testCase, tt := range tests {
+		r := bytes.NewReader(tt.encoded)
+		decoder := NewDecoder(r)
+
+		b.Run(testCase, func(b *testing.B) {
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				for {
+					_, err := decoder.Next()
+					if err == io.EOF {
+						break
+					}
+					if err != nil {
+						b.Fatal(err)
+					}
+				}
+			}
+
+		})
+	}
 }
