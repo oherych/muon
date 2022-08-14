@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"oherych/muon/internal"
 	"reflect"
 	"strings"
 
@@ -290,12 +291,17 @@ func (e Encoder) writeStruct(rv reflect.Value) error {
 
 	for i := 0; i < tt.NumField(); i++ {
 		tf := tt.Field(i)
-		vf := rv.Field(i)
 
-		if err := e.writeString(tf.Name); err != nil {
+		params := internal.ParseTags(tf)
+		if params.Skip {
+			continue
+		}
+
+		if err := e.writeString(params.Name); err != nil {
 			return err
 		}
 
+		vf := rv.Field(i)
 		if err := e.write(vf.Interface()); err != nil {
 			return err
 		}

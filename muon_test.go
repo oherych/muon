@@ -212,5 +212,16 @@ var (
 			encoded: []byte{dictStart, 0x61, stringEnd, 0x62, stringEnd, dictEnd},
 			tokens:  []Token{{A: tokenDictStart}, {A: TokenString, D: "a"}, {A: TokenString, D: "b"}, {A: tokenDictEnd}},
 		},
+
+		"simple_structure": {
+			golang:  SimpleStructure{B: "b_value", SkipMy: "skip_me"},
+			encoded: []byte{dictStart, 0x6d, 0x79, 0x5f, 0x62, stringEnd, 0x62, 0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, stringEnd, dictEnd},
+			tokens:  []Token{{A: tokenDictStart}, {A: TokenString, D: "my_b"}, {A: TokenString, D: "b_value"}, {A: tokenDictEnd}},
+		},
 	}
 )
+
+type SimpleStructure struct {
+	B      string `muon:"my_b"`
+	SkipMy string `muon:"-"`
+}
