@@ -28,6 +28,10 @@ func (r *Decoder) Next() (Token, error) {
 		return token, nil
 	}
 
+	if first == signatureStart {
+		return r.readSignature()
+	}
+
 	if r.inRange(first, zeroNumber, zeroNumber+9) {
 		return Token{A: TokenNumber, D: int(first - zeroNumber)}, nil
 	}
@@ -111,4 +115,13 @@ func (r Decoder) readCount() (int, error) {
 	v, err := leb128.ReadVarint64(r.b)
 
 	return int(v), err
+}
+
+func (r *Decoder) readSignature() (Token, error) {
+	target := make([]byte, len(signature)-1)
+	if _, err := r.b.Read(target); err != nil {
+		return Token{}, err
+	}
+
+	return Token{A: TokenString}, nil
 }

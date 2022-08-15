@@ -9,6 +9,7 @@ var (
 	testLongString = "test Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce mi mauris, fringilla a gravida ac, vulputate vitae dui. Proin rhoncus ante vitae purus mollis, id hendrerit tellus tempor. Aliquam ut ex nibh. Aenean quis quam eu purus scelerisque viverra ac consequat justo. Sed lobortis interdum facilisis. Sed euismod est magna, at iaculis nisi mollis a. Maecenas nec diam augue. Phasellus volutpat mattis nisi, eu sagittis enim tempor vitae. Aliquam sit amet ante finibus, bibendum lorem et, porta libero. Sed eu."
 
 	tests = map[string]struct {
+		config      Config
 		golang      interface{}
 		encoded     []byte
 		tokens      []Token
@@ -217,6 +218,13 @@ var (
 			golang:  SimpleStructure{B: "b_value", SkipMy: "skip_me"},
 			encoded: []byte{dictStart, 0x6d, 0x79, 0x5f, 0x62, stringEnd, 0x62, 0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, stringEnd, dictEnd},
 			tokens:  []Token{{A: tokenDictStart}, {A: TokenString, D: "my_b"}, {A: TokenString, D: "b_value"}, {A: tokenDictEnd}},
+		},
+
+		"with_signature": {
+			config:  Config{Signature: true},
+			golang:  testString,
+			encoded: []byte{0x8f, 0xb5, 0x30, 0x31, 0x74, 0x65, 0x73, 0x74, stringEnd},
+			tokens:  []Token{{A: TokenString}, {A: TokenString, D: testString}},
 		},
 	}
 )

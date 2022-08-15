@@ -19,16 +19,28 @@ const (
 )
 
 type Encoder struct {
-	b *bufio.Writer
+	config Config
+	b      *bufio.Writer
 }
 
-func NewEncoder(w io.Writer) Encoder {
+type Config struct {
+	Signature bool
+}
+
+func NewEncoder(w io.Writer, config Config) Encoder {
 	return Encoder{
-		b: bufio.NewWriter(w),
+		config: config,
+		b:      bufio.NewWriter(w),
 	}
 }
 
 func (e Encoder) Write(in interface{}) error {
+	if e.config.Signature {
+		if err := e.writeBytes(signature); err != nil {
+			return err
+		}
+	}
+
 	if err := e.write(in); err != nil {
 		return err
 	}
@@ -264,7 +276,6 @@ func (e Encoder) writeMap(rv reflect.Value) error {
 		}
 
 		iv := rv.MapIndex(k)
-		// TODO: type validation
 
 		if err := e.write(k.Interface()); err != nil {
 			return err

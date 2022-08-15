@@ -25,8 +25,9 @@ const (
 	negativeInfValue = 0xAE // -Inf
 	positiveInfValue = 0xAF // +Inf
 
-	stringStart = 0x82
-	typedArray  = 0x84
+	stringStart    = 0x82
+	typedArray     = 0x84
+	signatureStart = 0x8f
 
 	typeInt8    = 0xB0
 	typeInt16   = 0xB1
@@ -39,6 +40,10 @@ const (
 	typeFloat16 = 0xB8
 	typeFloat32 = 0xB9
 	typeFloat64 = 0xBA
+)
+
+var (
+	signature = []byte{signatureStart, 0xB5, 0x30, 0x31}
 )
 
 var (

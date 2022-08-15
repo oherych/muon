@@ -3,6 +3,7 @@ package muon
 import "math"
 
 const (
+	TokenSignature  TokenEnum = "signature"
 	TokenString     TokenEnum = "string"
 	tokenNil        TokenEnum = "nil"
 	tokenFalse      TokenEnum = "false"

@@ -12,7 +12,7 @@ func TestWrite(t *testing.T) {
 		t.Run(testCase, func(t *testing.T) {
 			var writer bytes.Buffer
 
-			err := NewEncoder(&writer).Write(tt.golang)
+			err := NewEncoder(&writer, tt.config).Write(tt.golang)
 
 			assert.Equal(t, tt.encoded, writer.Bytes())
 			assert.Nil(t, err)
@@ -23,7 +23,7 @@ func TestWrite(t *testing.T) {
 func BenchmarkEncoder(b *testing.B) {
 	for testCase, tt := range tests {
 		var writer DummyWriter
-		var encoder = NewEncoder(&writer)
+		var encoder = NewEncoder(&writer, tt.config)
 
 		b.Run(testCase, func(b *testing.B) {
 			b.ReportAllocs()
