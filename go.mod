@@ -1,6 +1,6 @@
 module oherych/muon
 
-go 1.17
+go 1.16
 
 require (
 	github.com/go-interpreter/wagon v0.6.0
