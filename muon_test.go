@@ -233,40 +233,73 @@ var (
 			golang:  uint16(math.MaxUint16),
 			encoded: []byte{typeUint16, 0xff, 0xff},
 			tokens:  []Token{{A: TokenNumber, D: uint16(math.MaxUint16)}},
+			unmarshal: map[string]unmarshalTest{
+				"empty_interface": {ptr: new(interface{}), exp: uint16(math.MaxUint16)},
+				"uint16":          {ptr: new(uint16), exp: uint16(math.MaxUint16)},
+				"uint32":          {ptr: new(uint32), exp: uint32(math.MaxUint16)},
+				"uint64":          {ptr: new(uint64), exp: uint64(math.MaxUint16)},
+			},
 		},
 		"uint32": {
 			golang:  uint32(math.MaxUint32),
 			encoded: []byte{typeUint32, 0xff, 0xff, 0xff, 0xff},
 			tokens:  []Token{{A: TokenNumber, D: uint32(math.MaxUint32)}},
+			unmarshal: map[string]unmarshalTest{
+				"empty_interface": {ptr: new(interface{}), exp: uint32(math.MaxUint32)},
+				"uint32":          {ptr: new(uint32), exp: uint32(math.MaxUint32)},
+				"uint64":          {ptr: new(uint64), exp: uint64(math.MaxUint32)},
+			},
 		},
 		"uint64": {
-			golang:  uint64(64),
-			encoded: []byte{typeUint64, 0x40, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
-			tokens:  []Token{{A: TokenNumber, D: uint64(64)}},
+			golang:  uint64(math.MaxUint64),
+			encoded: []byte{typeUint64, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+			tokens:  []Token{{A: TokenNumber, D: uint64(math.MaxUint64)}},
+			unmarshal: map[string]unmarshalTest{
+				"empty_interface": {ptr: new(interface{}), exp: uint64(math.MaxUint64)},
+				"uint64":          {ptr: new(uint64), exp: uint64(math.MaxUint64)},
+			},
 		},
 
 		"float32": {
-			golang:  float32(32.5),
-			encoded: []byte{typeFloat32, 0x0, 0x0, 0x2, 0x42},
-			tokens:  []Token{{A: TokenNumber, D: float32(32.5)}},
+			golang:  float32(math.MaxFloat32),
+			encoded: []byte{typeFloat32, 0xff, 0xff, 0x7f, 0x7f},
+			tokens:  []Token{{A: TokenNumber, D: float32(math.MaxFloat32)}},
+			unmarshal: map[string]unmarshalTest{
+				"empty_interface": {ptr: new(interface{}), exp: float32(math.MaxFloat32)},
+				"float32":         {ptr: new(float32), exp: float32(math.MaxFloat32)},
+				"float64":         {ptr: new(float64), exp: float64(math.MaxFloat32)},
+			},
 		},
 
 		"float64": {
-			golang:  float64(64.5),
-			encoded: []byte{typeFloat64, 0x0, 0x0, 0x0, 0x0, 0x0, 0x20, 0x50, 0x40},
-			tokens:  []Token{{A: TokenNumber, D: float64(64.5)}},
+			golang:  float64(math.MaxFloat64),
+			encoded: []byte{typeFloat64, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xef, 0x7f},
+			tokens:  []Token{{A: TokenNumber, D: float64(math.MaxFloat64)}},
+			unmarshal: map[string]unmarshalTest{
+				"empty_interface": {ptr: new(interface{}), exp: float64(math.MaxFloat64)},
+				"float64":         {ptr: new(float64), exp: float64(math.MaxFloat64)},
+			},
 		},
 
 		"float32_negative": {
-			golang:  float32(-32.5),
-			encoded: []byte{typeFloat32, 0x0, 0x0, 0x2, 0xc2},
-			tokens:  []Token{{A: TokenNumber, D: float32(-32.5)}},
+			golang:  float32(math.SmallestNonzeroFloat32),
+			encoded: []byte{typeFloat32, 0x1, 0x0, 0x0, 0x0},
+			tokens:  []Token{{A: TokenNumber, D: float32(math.SmallestNonzeroFloat32)}},
+			unmarshal: map[string]unmarshalTest{
+				"empty_interface": {ptr: new(interface{}), exp: float32(math.SmallestNonzeroFloat32)},
+				"float32":         {ptr: new(float32), exp: float32(math.SmallestNonzeroFloat32)},
+				"float64":         {ptr: new(float64), exp: float64(math.SmallestNonzeroFloat32)},
+			},
 		},
 
 		"float64_negative": {
-			golang:  float64(-64.5),
-			encoded: []byte{typeFloat64, 0x0, 0x0, 0x0, 0x0, 0x0, 0x20, 0x50, 0xc0},
-			tokens:  []Token{{A: TokenNumber, D: float64(-64.5)}},
+			golang:  float64(math.SmallestNonzeroFloat64),
+			encoded: []byte{typeFloat64, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			tokens:  []Token{{A: TokenNumber, D: float64(math.SmallestNonzeroFloat64)}},
+			unmarshal: map[string]unmarshalTest{
+				"empty_interface": {ptr: new(interface{}), exp: float64(math.SmallestNonzeroFloat64)},
+				"float64":         {ptr: new(float64), exp: float64(math.SmallestNonzeroFloat64)},
+			},
 		},
 
 		"flot_nan": {
@@ -274,16 +307,31 @@ var (
 			encoded:     []byte{nanValue},
 			tokens:      []Token{{A: TokenNumber, D: math.NaN()}},
 			skipReading: true,
+			unmarshal: map[string]unmarshalTest{
+				"empty_interface": {ptr: new(interface{}), exp: math.NaN()},
+				"float32":         {ptr: new(float32), exp: math.NaN()},
+				"float64":         {ptr: new(float64), exp: math.NaN()},
+			},
 		},
-		"flot_+Inf": {
+		"flot_-Inf": {
 			golang:  math.Inf(-1),
 			encoded: []byte{negativeInfValue},
 			tokens:  []Token{{A: TokenNumber, D: math.Inf(-1)}},
+			unmarshal: map[string]unmarshalTest{
+				"empty_interface": {ptr: new(interface{}), exp: math.Inf(-1)},
+				"float32":         {ptr: new(float32), exp: float32(math.Inf(-1))},
+				"float64":         {ptr: new(float64), exp: math.Inf(-1)},
+			},
 		},
-		"flot_-Inf": {
+		"flot_+Inf": {
 			golang:  math.Inf(1),
 			encoded: []byte{positiveInfValue},
 			tokens:  []Token{{A: TokenNumber, D: math.Inf(1)}},
+			unmarshal: map[string]unmarshalTest{
+				"empty_interface": {ptr: new(interface{}), exp: math.Inf(1)},
+				"float32":         {ptr: new(float32), exp: float32(math.Inf(1))},
+				"float64":         {ptr: new(float64), exp: math.Inf(1)},
+			},
 		},
 
 		"slice": {
@@ -329,6 +377,10 @@ var (
 			golang:  testString,
 			encoded: []byte{0x8f, 0xb5, 0x30, 0x31, 0x74, 0x65, 0x73, 0x74, stringEnd},
 			tokens:  []Token{{A: TokenSignature}, {A: TokenString, D: testString}},
+			unmarshal: map[string]unmarshalTest{
+				"empty_interface": {ptr: new(interface{}), exp: testString},
+				"string":          {ptr: new(string), exp: testString},
+			},
 		},
 	}
 )

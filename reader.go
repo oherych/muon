@@ -42,15 +42,8 @@ func (r *Decoder) Unmarshal(target interface{}) (err error) {
 	}
 
 	rv = rv.Elem()
-	if err := r.set(rv); err != nil {
-		return err
-	}
 
-	if _, err := r.Next(); err != io.EOF {
-		panic("expected EOF")
-	}
-
-	return nil
+	return r.set(rv)
 }
 
 func (r *Decoder) set(rv reflect.Value) error {
@@ -79,7 +72,7 @@ func (r *Decoder) set(rv reflect.Value) error {
 }
 
 func (r *Decoder) setNil(rv reflect.Value) {
-	if !isType(rv, reflect.Interface, reflect.Ptr, reflect.Map, reflect.Slice) {
+	if !isRange(rv, reflect.Interface, reflect.Slice) {
 		panic("wrong type")
 	}
 
@@ -87,7 +80,7 @@ func (r *Decoder) setNil(rv reflect.Value) {
 }
 
 func (r *Decoder) setNumber(rv reflect.Value, v interface{}) {
-	if !isRange(rv, reflect.Int, reflect.Uint64) {
+	if !isRange(rv, reflect.Int, reflect.Uint64) && !isRange(rv, reflect.Float32, reflect.Float64) {
 		panic("wrong type")
 	}
 
