@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func _TestDecoder_Unmarshal(t *testing.T) {
+func TestDecoder_Unmarshal(t *testing.T) {
 	for testCase, tt := range tests {
 		t.Run(testCase, func(t *testing.T) {
 			if tt.skipReading {

@@ -87,7 +87,11 @@ func (r *Decoder) setNil(rv reflect.Value) {
 }
 
 func (r *Decoder) setNumber(rv reflect.Value, v interface{}) {
-	rv.Set(reflect.ValueOf(v))
+	if !isRange(rv, reflect.Int, reflect.Uint64) {
+		panic("wrong type")
+	}
+
+	r.setValue(rv, v)
 }
 
 func (r *Decoder) setString(rv reflect.Value, v string) {
@@ -95,7 +99,7 @@ func (r *Decoder) setString(rv reflect.Value, v string) {
 		panic("wrong type")
 	}
 
-	rv.Set(reflect.ValueOf(v))
+	r.setValue(rv, v)
 }
 
 func (r *Decoder) setBool(rv reflect.Value, v bool) {
@@ -103,7 +107,16 @@ func (r *Decoder) setBool(rv reflect.Value, v bool) {
 		panic("wrong type")
 	}
 
-	rv.Set(reflect.ValueOf(v))
+	r.setValue(rv, v)
+}
+
+func (r *Decoder) setValue(target reflect.Value, v interface{}) {
+	var n = reflect.ValueOf(v)
+	if target.Type() != reflect.TypeOf(v) {
+		n = n.Convert(target.Type())
+	}
+
+	target.Set(n)
 }
 
 func (r *Decoder) Next() (Token, error) {
@@ -228,4 +241,14 @@ func isType(rv reflect.Value, exp ...reflect.Kind) bool {
 	}
 
 	return false
+}
+
+func isRange(rv reflect.Value, from, to reflect.Kind) bool {
+	kind := rv.Kind()
+
+	if kind == reflect.Interface && rv.NumMethod() == 0 {
+		return true
+	}
+
+	return kind >= from && kind <= to
 }
