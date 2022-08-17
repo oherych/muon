@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         go-version: [1.17.x, 1.18.x, 1.19.x]
-        arch: [armv6, armv7, aarch64, s390x, ppc64le]
+        arch: [arm, ia32, x32, x64]
 
     runs-on: ubuntu-latest
     steps:
@@ -20,7 +20,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          arch: ${{ matrix.arch }}
+          architecture: ${{ matrix.arch }}
           go-version: ${{ matrix.go-version }}
 
       - name: Test
