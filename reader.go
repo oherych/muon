@@ -3,6 +3,8 @@ package muon
 import (
 	"bufio"
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"github.com/go-interpreter/wagon/wasm/leb128"
 	"io"
 	"reflect"
@@ -16,6 +18,92 @@ func NewDecoder(r io.Reader) Decoder {
 	return Decoder{
 		b: bufio.NewReader(r),
 	}
+}
+
+func (r *Decoder) Unmarshal(target interface{}) (err error) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			return
+		}
+
+		if e, ok := r.(error); ok {
+			err = e
+			return
+		}
+
+		err = fmt.Errorf("%v", r)
+	}()
+
+	rv := reflect.ValueOf(target)
+
+	if rv.Kind() != reflect.Ptr || rv.IsNil() {
+		return errors.New("parameter should be pointer")
+	}
+
+	rv = rv.Elem()
+	if err := r.set(rv); err != nil {
+		return err
+	}
+
+	if _, err := r.Next(); err != io.EOF {
+		panic("expected EOF")
+	}
+
+	return nil
+}
+
+func (r *Decoder) set(rv reflect.Value) error {
+	token, err := r.Next()
+	if err != nil {
+		return err
+	}
+
+	switch token.A {
+	case TokenSignature:
+		// skip
+		return r.set(rv)
+	case tokenNil:
+		r.setNil(rv)
+	case TokenString:
+		r.setString(rv, token.D.(string))
+	case tokenTrue:
+		r.setBool(rv, true)
+	case tokenFalse:
+		r.setBool(rv, false)
+	case TokenNumber:
+		r.setNumber(rv, token.D)
+	}
+
+	return nil
+}
+
+func (r *Decoder) setNil(rv reflect.Value) {
+	if !isType(rv, reflect.Interface, reflect.Ptr, reflect.Map, reflect.Slice) {
+		panic("wrong type")
+	}
+
+	rv.Set(reflect.Zero(rv.Type()))
+}
+
+func (r *Decoder) setNumber(rv reflect.Value, v interface{}) {
+	rv.Set(reflect.ValueOf(v))
+}
+
+func (r *Decoder) setString(rv reflect.Value, v string) {
+	if !isType(rv, reflect.String) {
+		panic("wrong type")
+	}
+
+	rv.Set(reflect.ValueOf(v))
+}
+
+func (r *Decoder) setBool(rv reflect.Value, v bool) {
+	if !isType(rv, reflect.Bool) {
+		panic("wrong type")
+	}
+
+	rv.Set(reflect.ValueOf(v))
 }
 
 func (r *Decoder) Next() (Token, error) {
@@ -123,5 +211,21 @@ func (r *Decoder) readSignature() (Token, error) {
 		return Token{}, err
 	}
 
-	return Token{A: TokenString}, nil
+	return Token{A: TokenSignature}, nil
+}
+
+func isType(rv reflect.Value, exp ...reflect.Kind) bool {
+	kind := rv.Kind()
+
+	if kind == reflect.Interface && rv.NumMethod() == 0 {
+		return true
+	}
+
+	for _, e := range exp {
+		if kind == e {
+			return true
+		}
+	}
+
+	return false
 }

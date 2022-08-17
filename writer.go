@@ -177,6 +177,8 @@ func (e Encoder) writeFloat(rv reflect.Value, raw interface{}) error {
 }
 
 func (e Encoder) writeString(v string) error {
+	// TODO: with ref ID
+
 	// must be encoded as fixed-length if:
 	// longer than `longStringFactor` bytes, or contains any 0x00 bytes
 	if len(v) > longStringFactor || strings.ContainsRune(v, stringEnd) {
@@ -190,8 +192,6 @@ func (e Encoder) writeString(v string) error {
 
 		return e.writeBytes([]byte(v))
 	}
-
-	// TODO: with ref ID
 
 	return e.writeBytes([]byte(v), []byte{stringEnd})
 }

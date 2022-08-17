@@ -4,10 +4,35 @@ import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"io"
+	"reflect"
 	"testing"
 )
 
-func TestNewReader(t *testing.T) {
+func _TestDecoder_Unmarshal(t *testing.T) {
+	for testCase, tt := range tests {
+		t.Run(testCase, func(t *testing.T) {
+			if tt.skipReading {
+				t.SkipNow()
+			}
+
+			for targetName, in := range tt.unmarshal {
+				t.Run(targetName, func(t *testing.T) {
+					dr := bytes.NewReader(tt.encoded)
+					decoder := NewDecoder(dr)
+
+					err := decoder.Unmarshal(in.ptr)
+					if err != nil {
+						t.Fatal(err)
+					}
+
+					assert.Equal(t, in.exp, reflect.ValueOf(in.ptr).Elem().Interface())
+				})
+			}
+		})
+	}
+}
+
+func TestDecoder_Next(t *testing.T) {
 	for testCase, tt := range tests {
 		t.Run(testCase, func(t *testing.T) {
 			if tt.skipReading {
