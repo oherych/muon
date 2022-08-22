@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"oherych/muon/internal"
 	"reflect"
 	"strings"
+
+	"github.com/oherych/muon/internal"
 
 	"github.com/go-interpreter/wagon/wasm/leb128"
 )
