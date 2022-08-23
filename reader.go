@@ -4,10 +4,10 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
-	"fmt"
-	"github.com/go-interpreter/wagon/wasm/leb128"
 	"io"
 	"reflect"
+
+	"github.com/go-interpreter/wagon/wasm/leb128"
 )
 
 type Decoder struct {
@@ -21,20 +21,6 @@ func NewDecoder(r io.Reader) Decoder {
 }
 
 func (r *Decoder) Unmarshal(target interface{}) (err error) {
-	defer func() {
-		r := recover()
-		if r == nil {
-			return
-		}
-
-		if e, ok := r.(error); ok {
-			err = e
-			return
-		}
-
-		err = fmt.Errorf("%v", r)
-	}()
-
 	rv := reflect.ValueOf(target)
 
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
@@ -43,67 +29,19 @@ func (r *Decoder) Unmarshal(target interface{}) (err error) {
 
 	rv = rv.Elem()
 
-	return r.set(rv)
+	return setter{Decoder: r}.Read(rv)
+
 }
 
-func (r *Decoder) set(rv reflect.Value) error {
-	token, err := r.Next()
-	if err != nil {
-		return err
-	}
+//func (r *Decoder) setNil(rv reflect.Value) {
+//	if !isRange(rv, reflect.Interface, reflect.Slice) {
+//		panic("wrong type")
+//	}
+//
+//	rv.Set(reflect.Zero(rv.Type()))
+//}
 
-	switch token.A {
-	case TokenSignature:
-		// skip
-		return r.set(rv)
-	case tokenNil:
-		r.setNil(rv)
-	case TokenString:
-		r.setString(rv, token.D.(string))
-	case tokenTrue:
-		r.setBool(rv, true)
-	case tokenFalse:
-		r.setBool(rv, false)
-	case TokenNumber:
-		r.setNumber(rv, token.D)
-	}
-
-	return nil
-}
-
-func (r *Decoder) setNil(rv reflect.Value) {
-	if !isRange(rv, reflect.Interface, reflect.Slice) {
-		panic("wrong type")
-	}
-
-	rv.Set(reflect.Zero(rv.Type()))
-}
-
-func (r *Decoder) setNumber(rv reflect.Value, v interface{}) {
-	if !isRange(rv, reflect.Int, reflect.Uint64) && !isRange(rv, reflect.Float32, reflect.Float64) {
-		panic("wrong type")
-	}
-
-	r.setValue(rv, v)
-}
-
-func (r *Decoder) setString(rv reflect.Value, v string) {
-	if !isType(rv, reflect.String) {
-		panic("wrong type")
-	}
-
-	r.setValue(rv, v)
-}
-
-func (r *Decoder) setBool(rv reflect.Value, v bool) {
-	if !isType(rv, reflect.Bool) {
-		panic("wrong type")
-	}
-
-	r.setValue(rv, v)
-}
-
-func (r *Decoder) setValue(target reflect.Value, v interface{}) {
+func setValue(target reflect.Value, v interface{}) {
 	var n = reflect.ValueOf(v)
 	if target.Type() != reflect.TypeOf(v) {
 		n = n.Convert(target.Type())
@@ -127,7 +65,7 @@ func (r *Decoder) Next() (Token, error) {
 	}
 
 	if r.inRange(first, zeroNumber, zeroNumber+9) {
-		return Token{A: TokenNumber, D: int(first - zeroNumber)}, nil
+		return Token{A: TokenLiteral, D: int(first - zeroNumber)}, nil
 	}
 
 	if r.inRange(first, typeInt8, typeFloat64) {
@@ -142,7 +80,7 @@ func (r *Decoder) Next() (Token, error) {
 			return Token{}, err
 		}
 
-		return Token{A: TokenNumber, D: rv.Elem().Interface()}, nil
+		return Token{A: TokenLiteral, D: rv.Elem().Interface()}, nil
 	}
 
 	if first == typedArray {
@@ -182,11 +120,11 @@ func (r *Decoder) Next() (Token, error) {
 			return Token{}, err
 		}
 
-		return Token{A: TokenString, D: string(buf)}, nil
+		return Token{A: TokenLiteral, D: string(buf)}, nil
 	}
 
 	if first == stringEnd {
-		return Token{A: TokenString, D: ""}, nil
+		return Token{A: TokenLiteral, D: ""}, nil
 	}
 
 	if err := r.b.UnreadByte(); err != nil {
@@ -198,7 +136,7 @@ func (r *Decoder) Next() (Token, error) {
 		return Token{}, err
 	}
 
-	return Token{A: TokenString, D: str[:len(str)-1]}, nil
+	return Token{A: TokenLiteral, D: str[:len(str)-1]}, nil
 }
 
 func (Decoder) inRange(v, a, b byte) bool {
@@ -218,30 +156,4 @@ func (r *Decoder) readSignature() (Token, error) {
 	}
 
 	return Token{A: TokenSignature}, nil
-}
-
-func isType(rv reflect.Value, exp ...reflect.Kind) bool {
-	kind := rv.Kind()
-
-	if kind == reflect.Interface && rv.NumMethod() == 0 {
-		return true
-	}
-
-	for _, e := range exp {
-		if kind == e {
-			return true
-		}
-	}
-
-	return false
-}
-
-func isRange(rv reflect.Value, from, to reflect.Kind) bool {
-	kind := rv.Kind()
-
-	if kind == reflect.Interface && rv.NumMethod() == 0 {
-		return true
-	}
-
-	return kind >= from && kind <= to
 }

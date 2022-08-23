@@ -9,6 +9,7 @@ import (
 	"math"
 	"reflect"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/oherych/muon/internal"
 
@@ -182,7 +183,7 @@ func (e Encoder) writeString(v string) error {
 
 	// must be encoded as fixed-length if:
 	// longer than `longStringFactor` bytes, or contains any 0x00 bytes
-	if len(v) > longStringFactor || strings.ContainsRune(v, stringEnd) {
+	if len(v) > longStringFactor || !utf8.ValidString(v) || strings.ContainsRune(v, stringEnd) {
 		if err := e.writeByte(stringStart); err != nil {
 			return err
 		}
