@@ -16,6 +16,10 @@ func (s setter) Read(target reflect.Value) error {
 		return err
 	}
 
+	if token.A == TokenSignature {
+		return s.Read(target)
+	}
+
 	return s.Set(token, target)
 }
 
@@ -128,10 +132,10 @@ func (s setter) SetSlice(token Token, target reflect.Value) error {
 
 	if token.A == TokenTypedArray {
 		fmt.Println(token)
-		panic("sd")
+		return newError(ErrCodeNotImplemented, "%s", token.A)
 	}
 
-	return newError(0, "can't apply %s to %s", token.A, target.Type())
+	return newError(ErrCodeInvalidType, "can't apply %s to %s", token.A, target.Type())
 }
 
 func (s setter) SetInterface(token Token, target reflect.Value) error {

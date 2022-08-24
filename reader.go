@@ -33,14 +33,6 @@ func (r *Decoder) Unmarshal(target interface{}) (err error) {
 
 }
 
-//func (r *Decoder) setNil(rv reflect.Value) {
-//	if !isRange(rv, reflect.Interface, reflect.Slice) {
-//		panic("wrong type")
-//	}
-//
-//	rv.Set(reflect.Zero(rv.Type()))
-//}
-
 func setValue(target reflect.Value, v interface{}) {
 	var n = reflect.ValueOf(v)
 	if target.Type() != reflect.TypeOf(v) {
@@ -71,7 +63,7 @@ func (r *Decoder) Next() (Token, error) {
 	if r.inRange(first, typeInt8, typeFloat64) {
 		t, ok := muonTypeToType[first]
 		if !ok {
-			panic("sd")
+			return Token{}, newError(ErrCodeUnexpectedSystem, "can't find element '%v' in muonTypeToType", first)
 		}
 
 		rv := reflect.New(t)
@@ -91,7 +83,7 @@ func (r *Decoder) Next() (Token, error) {
 
 		t, ok := muonTypeToType[tb]
 		if !ok {
-			panic("sd")
+			return Token{}, newError(ErrCodeUnexpectedSystem, "can't find element '%v' in muonTypeToType", tb)
 		}
 
 		size, err := r.readCount()

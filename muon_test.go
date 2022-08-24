@@ -23,7 +23,8 @@ var (
 			tokens:  []Token{{A: TokenLiteral, D: nil}},
 			unmarshal: map[string]unmarshalTest{
 				"empty_interface": {ptr: new(interface{}), exp: nil},
-				"slice":           {ptr: new(map[string]int), exp: map[string]int(nil)},
+				"slice":           {ptr: new([]int), exp: []int(nil)},
+				"map":             {ptr: new(map[string]int), exp: map[string]int(nil)},
 			},
 		},
 		"string_empty": {
@@ -381,13 +382,13 @@ var (
 		},
 
 		"with_signature": {
-			config:    Config{Signature: true},
-			golang:    testString,
-			encoded:   []byte{0x8f, 0xb5, 0x30, 0x31, 0x74, 0x65, 0x73, 0x74, stringEnd},
-			tokens:    []Token{{A: TokenSignature}, {A: TokenLiteral, D: testString}},
+			config:  Config{Signature: true},
+			golang:  testString,
+			encoded: []byte{signatureStart, 0xb5, 0x30, 0x31, 0x74, 0x65, 0x73, 0x74, stringEnd},
+			tokens:  []Token{{A: TokenSignature}, {A: TokenLiteral, D: testString}},
 			unmarshal: map[string]unmarshalTest{
-				//"empty_interface": {ptr: new(interface{}), exp: testString},
-				//"string":          {ptr: new(string), exp: testString},
+				"empty_interface": {ptr: new(interface{}), exp: testString},
+				"string":          {ptr: new(string), exp: testString},
 			},
 		},
 	}

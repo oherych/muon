@@ -2,6 +2,12 @@ package muon
 
 import "fmt"
 
+const (
+	ErrCodeNotImplemented = iota
+	ErrCodeUnexpectedSystem
+	ErrCodeInvalidType
+)
+
 type Error struct {
 	Code int
 	Msg  string
