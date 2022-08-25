@@ -6,10 +6,6 @@ import (
 	"strings"
 )
 
-const (
-	tag = "muon"
-)
-
 var (
 	matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
 	matchAllCap   = regexp.MustCompile("([a-z0-9])([A-Z])")
@@ -20,8 +16,8 @@ type TagInfo struct {
 	Skip bool
 }
 
-func ParseTags(field reflect.StructField) TagInfo {
-	val := field.Tag.Get(tag)
+func ParseTags(tagName string, field reflect.StructField) TagInfo {
+	val := field.Tag.Get(tagName)
 	parts := strings.Split(val, ",")
 
 	skip := parts[0] == "-"

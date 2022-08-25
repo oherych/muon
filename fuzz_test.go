@@ -29,10 +29,10 @@ func FuzzBool(f *testing.F) {
 
 func fuzzNew[T any](t *testing.T, in T) {
 	var writer bytes.Buffer
-	encoder := NewEncoder(&writer, Config{})
+	encoder := NewEncoder(&writer)
 	decoder := NewDecoder(&writer)
 
-	if err := encoder.Write(in); err != nil {
+	if err := encoder.Marshal(in); err != nil {
 		t.Fatal(err)
 	}
 

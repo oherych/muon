@@ -20,37 +20,40 @@ const (
 	longStringFactor = 512
 )
 
+const (
+	defaultTag = "muon"
+)
+
 type Encoder struct {
-	config Config
-	b      *bufio.Writer
+	WithSignature bool
+	TagName       string
+
+	b *bufio.Writer
 }
 
-type Config struct {
-	Signature bool
-}
-
-func NewEncoder(w io.Writer, config Config) Encoder {
+func NewEncoder(w io.Writer) Encoder {
 	return Encoder{
-		config: config,
-		b:      bufio.NewWriter(w),
+		TagName: defaultTag,
+
+		b: bufio.NewWriter(w),
 	}
 }
 
-func (e Encoder) Write(in interface{}) error {
-	if e.config.Signature {
-		if err := e.writeBytes(signature); err != nil {
+func (e Encoder) Marshal(in interface{}) error {
+	if e.WithSignature {
+		if err := e.writeBytes(Signature); err != nil {
 			return err
 		}
 	}
 
-	if err := e.write(in); err != nil {
+	if err := e.add(in); err != nil {
 		return err
 	}
 
 	return e.b.Flush()
 }
 
-func (e Encoder) write(in interface{}) error {
+func (e Encoder) add(in interface{}) error {
 	if m, ok := in.(Marshaler); ok {
 		data, err := m.MarshalMuon()
 		if err != nil {
@@ -65,7 +68,7 @@ func (e Encoder) write(in interface{}) error {
 	}
 
 	if in == nil {
-		return e.writeByte(nilValue)
+		return e.b.WriteByte(NullValue)
 	}
 
 	rv := reflect.ValueOf(in)
@@ -104,7 +107,7 @@ func (e Encoder) write(in interface{}) error {
 	}
 
 	if kind == reflect.Ptr {
-		return e.write(rv.Elem().Interface())
+		return e.add(rv.Elem().Interface())
 	}
 
 	return fmt.Errorf("type %s not supportable", rv.Type())
@@ -112,16 +115,16 @@ func (e Encoder) write(in interface{}) error {
 
 func (e Encoder) writeBool(v bool) error {
 	if v {
-		return e.writeByte(boolTrue)
+		return e.b.WriteByte(BoolTrue)
 	}
 
-	return e.writeByte(boolFalse)
+	return e.b.WriteByte(BoolFalse)
 }
 
 func (e Encoder) writeInteger(rv reflect.Value, raw interface{}) error {
 	v := rv.Int()
 	if v >= 0 && v <= 9 {
-		return e.writeByte(zeroNumber + byte(v))
+		return e.b.WriteByte(ZeroNumber + byte(v))
 	}
 
 	if err := e.writeTyped(rv.Kind()); err != nil {
@@ -142,7 +145,7 @@ func (e Encoder) writeInteger(rv reflect.Value, raw interface{}) error {
 func (e Encoder) writeUint(rv reflect.Value, raw interface{}) error {
 	v := rv.Uint()
 	if v <= 9 {
-		return e.writeByte(zeroNumber + byte(v))
+		return e.b.WriteByte(ZeroNumber + byte(v))
 	}
 
 	if err := e.writeTyped(rv.Kind()); err != nil {
@@ -162,13 +165,13 @@ func (e Encoder) writeFloat(rv reflect.Value, raw interface{}) error {
 	v := rv.Float()
 
 	if math.IsNaN(v) {
-		return e.writeByte(nanValue)
+		return e.b.WriteByte(NanValue)
 	}
 	if math.IsInf(v, -1) {
-		return e.writeByte(negativeInfValue)
+		return e.b.WriteByte(NegativeInfValue)
 	}
 	if math.IsInf(v, 1) {
-		return e.writeByte(positiveInfValue)
+		return e.b.WriteByte(PositiveInfValue)
 	}
 
 	if err := e.writeTyped(rv.Kind()); err != nil {
@@ -183,8 +186,8 @@ func (e Encoder) writeString(v string) error {
 
 	// must be encoded as fixed-length if:
 	// longer than `longStringFactor` bytes, or contains any 0x00 bytes
-	if len(v) > longStringFactor || !utf8.ValidString(v) || strings.ContainsRune(v, stringEnd) {
-		if err := e.writeByte(stringStart); err != nil {
+	if len(v) > longStringFactor || !utf8.ValidString(v) || strings.ContainsRune(v, StringEnd) {
+		if err := e.b.WriteByte(CountTag); err != nil {
 			return err
 		}
 
@@ -195,7 +198,7 @@ func (e Encoder) writeString(v string) error {
 		return e.writeBytes([]byte(v))
 	}
 
-	return e.writeBytes([]byte(v), []byte{stringEnd})
+	return e.writeBytes([]byte(v), []byte{StringEnd})
 }
 
 func (e Encoder) writeCount(v int) error {
@@ -203,12 +206,12 @@ func (e Encoder) writeCount(v int) error {
 }
 
 func (e Encoder) writeTyped(k reflect.Kind) error {
-	tb, ok := kindToMuonType[k]
+	tb, ok := KindToMuonType[k]
 	if !ok {
-		return errors.New("unexpected error: cannot find type in kindToMuonType map")
+		return errors.New("unexpected error: cannot find type in KindToMuonType map")
 	}
 
-	return e.writeByte(tb)
+	return e.b.WriteByte(tb)
 }
 
 func (e Encoder) writeLittleEndian(in interface{}) error {
@@ -218,12 +221,12 @@ func (e Encoder) writeLittleEndian(in interface{}) error {
 func (e Encoder) writeList(rv reflect.Value) error {
 	kind := rv.Type().Elem().Kind()
 
-	if tb, ok := kindToMuonType[kind]; ok {
-		if err := e.writeByte(typedArray); err != nil {
+	if tb, ok := KindToMuonType[kind]; ok {
+		if err := e.b.WriteByte(TypedArray); err != nil {
 			return err
 		}
 
-		if err := e.writeByte(tb); err != nil {
+		if err := e.b.WriteByte(tb); err != nil {
 			return err
 		}
 
@@ -250,17 +253,17 @@ func (e Encoder) writeList(rv reflect.Value) error {
 		return nil
 	}
 
-	if err := e.writeByte(listStart); err != nil {
+	if err := e.b.WriteByte(ListStart); err != nil {
 		return err
 	}
 
 	for i := 0; i < rv.Len(); i++ {
-		if err := e.write(rv.Index(i).Interface()); err != nil {
+		if err := e.add(rv.Index(i).Interface()); err != nil {
 			return err
 		}
 	}
 
-	if err := e.writeByte(listEnd); err != nil {
+	if err := e.b.WriteByte(ListEnd); err != nil {
 		return err
 	}
 
@@ -268,27 +271,27 @@ func (e Encoder) writeList(rv reflect.Value) error {
 }
 
 func (e Encoder) writeMap(rv reflect.Value) error {
-	if err := e.writeByte(dictStart); err != nil {
+	if err := e.b.WriteByte(DictStart); err != nil {
 		return err
 	}
 
 	for _, k := range rv.MapKeys() {
-		if k.Kind() != reflect.String && kindToMuonType[k.Kind()] == 0 {
+		if k.Kind() != reflect.String && KindToMuonType[k.Kind()] == 0 {
 			return errors.New("wrong type of dict key")
 		}
 
 		iv := rv.MapIndex(k)
 
-		if err := e.write(k.Interface()); err != nil {
+		if err := e.add(k.Interface()); err != nil {
 			return err
 		}
 
-		if err := e.write(iv.Interface()); err != nil {
+		if err := e.add(iv.Interface()); err != nil {
 			return err
 		}
 	}
 
-	if err := e.writeByte(dictEnd); err != nil {
+	if err := e.b.WriteByte(DictEnd); err != nil {
 		return err
 	}
 
@@ -296,7 +299,7 @@ func (e Encoder) writeMap(rv reflect.Value) error {
 }
 
 func (e Encoder) writeStruct(rv reflect.Value) error {
-	if err := e.writeByte(dictStart); err != nil {
+	if err := e.b.WriteByte(DictStart); err != nil {
 		return err
 	}
 
@@ -305,7 +308,7 @@ func (e Encoder) writeStruct(rv reflect.Value) error {
 	for i := 0; i < tt.NumField(); i++ {
 		tf := tt.Field(i)
 
-		params := internal.ParseTags(tf)
+		params := internal.ParseTags(e.TagName, tf)
 		if params.Skip {
 			continue
 		}
@@ -315,12 +318,12 @@ func (e Encoder) writeStruct(rv reflect.Value) error {
 		}
 
 		vf := rv.Field(i)
-		if err := e.write(vf.Interface()); err != nil {
+		if err := e.add(vf.Interface()); err != nil {
 			return err
 		}
 	}
 
-	if err := e.writeByte(dictEnd); err != nil {
+	if err := e.b.WriteByte(DictEnd); err != nil {
 		return err
 	}
 
@@ -335,8 +338,4 @@ func (e Encoder) writeBytes(val ...[]byte) error {
 	}
 
 	return nil
-}
-
-func (e Encoder) writeByte(val byte) error {
-	return e.b.WriteByte(val)
 }

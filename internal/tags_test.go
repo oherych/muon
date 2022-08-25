@@ -27,7 +27,7 @@ func TestParseTags(t *testing.T) {
 
 		t.Run(f.Name, func(t *testing.T) {
 
-			got := ParseTags(f)
+			got := ParseTags("muon", f)
 
 			assert.Equal(t, exp[f.Name], got)
 		})
