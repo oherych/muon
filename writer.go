@@ -1,6 +1,7 @@
 package muon
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"math"
@@ -8,6 +9,7 @@ import (
 	"strings"
 
 	"ekyu.moe/leb128"
+	"oherych/muon/internal"
 )
 
 const (
@@ -121,7 +123,7 @@ func (e Encoder) writeUint(w io.Writer, rv reflect.Value) error {
 		return e.writeBytes(w, []byte{0xA0 + byte(v)})
 	}
 
-	return e.writeBytes(w, []byte{0xBB}, leb128.AppendUleb128(nil, v))
+	return e.writeBytes(w, []byte{0xBB}, leb128.AppendSleb128(nil, int64(v)))
 }
 
 func (e Encoder) writeFloat(w io.Writer, rv reflect.Value) error {
@@ -137,14 +139,17 @@ func (e Encoder) writeFloat(w io.Writer, rv reflect.Value) error {
 		return e.writeByte(w, positiveInfValue)
 	}
 
-	panic("implement me")
+	var buf [9]byte
+	buf[0] = floatF64
+	binary.LittleEndian.PutUint64(buf[1:], math.Float64bits(v))
+	return e.writeBytes(w, buf[:])
 }
 
 func (e Encoder) writeString(w io.Writer, v string) error {
 	// must be encoded as fixed-length if:
 	// longer than `longStringFactor` bytes, or contains any 0x00 bytes
-	if len(v) > longStringFactor || strings.ContainsRune(v, stringEnd) {
-		return e.writeBytes(w, []byte{stringStart}, []byte(v))
+	if len(v) >= longStringFactor || strings.ContainsRune(v, stringEnd) {
+		return e.writeBytes(w, []byte{tagSize}, leb128.AppendUleb128(nil, uint64(len(v))), []byte(v))
 	}
 
 	// TODO: with ref ID
@@ -224,7 +229,16 @@ func (e Encoder) writeStruct(w io.Writer, rv reflect.Value) error {
 		tf := tt.Field(i)
 		vf := rv.Field(i)
 
-		if err := e.writeString(w, tf.Name); err != nil {
+		if !tf.IsExported() {
+			continue
+		}
+
+		info := internal.ParseTags(tf)
+		if info.Skip {
+			continue
+		}
+
+		if err := e.writeString(w, info.Name); err != nil {
 			return err
 		}
 

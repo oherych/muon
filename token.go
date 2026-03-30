@@ -10,6 +10,7 @@ const (
 	tokenDictStart TokenEnum = "dict_start"
 	tokenDictEnd   TokenEnum = "dict_end"
 	tokenInt       TokenEnum = "int"
+	TokenFloat     TokenEnum = "float"
 )
 
 var (

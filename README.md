@@ -1,5 +1,7 @@
 # muon
 
+Go implementation of the [µON (muon)](https://github.com/vshymanskyy/muon) binary serialization format — a compact, self-describing, schemaless notation that uses gaps in the UTF-8 encoding space to encode structured data.
+
 
 
 

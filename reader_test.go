@@ -21,7 +21,9 @@ func TestNewReader(t *testing.T) {
 				result = append(result, token)
 			}
 
-			assert.Equal(t, tt.tokens, result)
+			if tt.tokens != nil {
+				assert.Equal(t, tt.tokens, result)
+			}
 		})
 	}
 

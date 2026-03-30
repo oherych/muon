@@ -20,6 +20,7 @@ const (
 	negativeInfValue = 0xAE // -Inf
 	positiveInfValue = 0xAF // +Inf
 
-	stringStart = 0x82
-	typedArray  = 0x84
+	tagSize    = 0x8B
+	typedArray = 0x84
+	floatF64   = 0xBA
 )
