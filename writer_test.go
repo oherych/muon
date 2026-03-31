@@ -96,8 +96,19 @@ var (
 		//},
 		"byte_slice": {
 			golang:  []byte{1, 30},
-			encoded: []byte{listStart, 0xa1, 0xbb, 0x1e, listEnd},
-			tokens:  []Token{{A: tokenListStart}, {A: tokenInt, Data: 1}, {A: tokenInt, Data: 30}, {A: tokenListEnd}},
+			encoded: []byte{typedArray, typeUint8, 0x02, 0x01, 0x1e},
+			tokens:  []Token{{A: TokenTypedArray, Data: []uint8{1, 30}}},
+		},
+
+		"typed_array_int32": {
+			golang:  []int32{10, 500},
+			encoded: []byte{typedArray, typeInt32, 0x02, 0x0a, 0x00, 0x00, 0x00, 0xf4, 0x01, 0x00, 0x00},
+			tokens:  []Token{{A: TokenTypedArray, Data: []int32{10, 500}}},
+		},
+		"typed_array_float64": {
+			golang:  []float64{1.5},
+			encoded: []byte{typedArray, typeFloat64, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf8, 0x3f},
+			tokens:  []Token{{A: TokenTypedArray, Data: []float64{1.5}}},
 		},
 
 		"array": {

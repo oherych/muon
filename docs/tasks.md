@@ -22,13 +22,15 @@ Spec reference: https://github.com/vshymanskyy/muon
 - [x] `writer_test.go`: add float64 test cases (pi, neg, zero, nan, ±inf)
 - [x] `writer_test.go` / `reader_test.go`: add struct tag test cases
 
-## Phase 2 — Typed integers & TypedArray
+## Phase 2 — Typed integers & TypedArray ✅ DONE
 
-- [ ] `writer.go`: typed integer write (`0xB0..0xB7`, LE) for use inside TypedArray
-- [ ] `writer.go`: `writeList()` for typed slices → `0x84` + type byte + ULEB128 count + packed values
-- [ ] `reader.go`: handle `0x84` → tokenTypedArray
-- [ ] `token.go`: add `tokenTypedArray`
-- [ ] `writer_test.go`: activate commented-out `typed_array` test
+- [x] `consts.go`: add type bytes `typeInt8..typeFloat64` (`0xB0..0xBA`)
+- [x] `token.go`: add `TokenTypedArray`
+- [x] `writer.go`: replace `kindToType` with `elemKindToTypeByte` (checks element kind, not slice kind)
+- [x] `writer.go`: `writeList()` dispatches to `writeTypedArray()` for supported element types
+- [x] `writer.go`: `writeTypedArray()` + `writeTypedElem()` — packed LE bytes
+- [x] `reader.go`: handle `0x84` → `readTypedElems()` → `TokenTypedArray` with typed Go slice
+- [x] `writer_test.go`: `byte_slice` updated to TypedArray encoding; added `typed_array_int32`, `typed_array_float64`
 
 ## Phase 3 — Dict completeness
 

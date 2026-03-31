@@ -17,20 +17,18 @@ const (
 )
 
 var (
-	kindToType = map[reflect.Kind]byte{
-		reflect.Int:     0,
-		reflect.Int8:    0,
-		reflect.Int16:   0,
-		reflect.Int32:   0,
-		reflect.Int64:   0,
-		reflect.Uint:    0,
-		reflect.Uint8:   0,
-		reflect.Uint16:  0,
-		reflect.Uint32:  0,
-		reflect.Uint64:  0,
-		reflect.Uintptr: 0,
-		reflect.Float32: 0,
-		reflect.Float64: 0,
+	// maps element kind → TypedArray type byte; int/uint omitted (platform-dependent)
+	elemKindToTypeByte = map[reflect.Kind]byte{
+		reflect.Int8:    typeInt8,
+		reflect.Int16:   typeInt16,
+		reflect.Int32:   typeInt32,
+		reflect.Int64:   typeInt64,
+		reflect.Uint8:   typeUint8,
+		reflect.Uint16:  typeUint16,
+		reflect.Uint32:  typeUint32,
+		reflect.Uint64:  typeUint64,
+		reflect.Float32: typeFloat32,
+		reflect.Float64: typeFloat64,
 	}
 )
 
@@ -157,40 +155,71 @@ func (e Encoder) writeString(w io.Writer, v string) error {
 	return e.writeBytes(w, []byte(v), []byte{stringEnd})
 }
 
-// TODO
-
 func (e Encoder) writeList(w io.Writer, rv reflect.Value) error {
-	kind := rv.Kind()
-
-	if tb, ok := kindToType[kind]; ok {
-		if err := e.writeBytes(w, []byte{typedArray, tb}); err != nil {
-			return err
-		}
-
-		if err := e.write(w, rv.Len()); err != nil {
-			return err
-		}
-
-		// TODO: implement me
-
-		return nil
+	elemKind := rv.Type().Elem().Kind()
+	if tb, ok := elemKindToTypeByte[elemKind]; ok {
+		return e.writeTypedArray(w, rv, tb)
 	}
 
 	if err := e.writeByte(w, listStart); err != nil {
 		return err
 	}
-
 	for i := 0; i < rv.Len(); i++ {
 		if err := e.write(w, rv.Index(i).Interface()); err != nil {
 			return err
 		}
 	}
+	return e.writeByte(w, listEnd)
+}
 
-	if err := e.writeByte(w, listEnd); err != nil {
+func (e Encoder) writeTypedArray(w io.Writer, rv reflect.Value, typeByte byte) error {
+	n := rv.Len()
+	if err := e.writeBytes(w, []byte{typedArray, typeByte}, leb128.AppendUleb128(nil, uint64(n))); err != nil {
 		return err
 	}
-
+	for i := 0; i < n; i++ {
+		if err := e.writeTypedElem(w, rv.Index(i), typeByte); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func (e Encoder) writeTypedElem(w io.Writer, rv reflect.Value, typeByte byte) error {
+	var buf [8]byte
+	switch typeByte {
+	case typeInt8:
+		buf[0] = byte(rv.Int())
+		return e.writeBytes(w, buf[:1])
+	case typeInt16:
+		binary.LittleEndian.PutUint16(buf[:], uint16(rv.Int()))
+		return e.writeBytes(w, buf[:2])
+	case typeInt32:
+		binary.LittleEndian.PutUint32(buf[:], uint32(rv.Int()))
+		return e.writeBytes(w, buf[:4])
+	case typeInt64:
+		binary.LittleEndian.PutUint64(buf[:], uint64(rv.Int()))
+		return e.writeBytes(w, buf[:8])
+	case typeUint8:
+		buf[0] = byte(rv.Uint())
+		return e.writeBytes(w, buf[:1])
+	case typeUint16:
+		binary.LittleEndian.PutUint16(buf[:], uint16(rv.Uint()))
+		return e.writeBytes(w, buf[:2])
+	case typeUint32:
+		binary.LittleEndian.PutUint32(buf[:], uint32(rv.Uint()))
+		return e.writeBytes(w, buf[:4])
+	case typeUint64:
+		binary.LittleEndian.PutUint64(buf[:], rv.Uint())
+		return e.writeBytes(w, buf[:8])
+	case typeFloat32:
+		binary.LittleEndian.PutUint32(buf[:], math.Float32bits(float32(rv.Float())))
+		return e.writeBytes(w, buf[:4])
+	case typeFloat64:
+		binary.LittleEndian.PutUint64(buf[:], math.Float64bits(rv.Float()))
+		return e.writeBytes(w, buf[:8])
+	}
+	return fmt.Errorf("unsupported typed array element type byte: 0x%02X", typeByte)
 }
 
 func (e Encoder) writeMap(w io.Writer, rv reflect.Value) error {

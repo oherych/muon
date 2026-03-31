@@ -2,6 +2,7 @@ package muon
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"math"
 
@@ -77,6 +78,22 @@ func (r *Reader) Next() (Token, error) {
 		return Token{A: TokenFloat, Data: float64(math.Float32frombits(bits))}, nil
 	}
 
+	// TypedArray: 0x84 + type_byte + ULEB128(count) + packed LE bytes
+	if first == typedArray {
+		if r.scanp >= len(r.in) {
+			return Token{}, io.EOF
+		}
+		typeByte := r.in[r.scanp]
+		r.scanp++
+		count, n := leb128.DecodeUleb128(r.in[r.scanp:])
+		r.scanp += int(n)
+		data, err := r.readTypedElems(typeByte, int(count))
+		if err != nil {
+			return Token{}, err
+		}
+		return Token{A: TokenTypedArray, Data: data}, nil
+	}
+
 	// size-tagged (fixed-length) string: 0x8B + ULEB128(len) + bytes
 	if first == tagSize {
 		length, n := leb128.DecodeUleb128(r.in[r.scanp:])
@@ -105,4 +122,118 @@ func (r *Reader) Next() (Token, error) {
 	}
 
 	return Token{}, io.EOF
+}
+
+func (r *Reader) readTypedElems(typeByte byte, count int) (interface{}, error) {
+	read := func(n int) ([]byte, error) {
+		end := r.scanp + n*count
+		if end > len(r.in) {
+			return nil, io.EOF
+		}
+		b := r.in[r.scanp:end]
+		r.scanp = end
+		return b, nil
+	}
+
+	switch typeByte {
+	case typeInt8:
+		b, err := read(1)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]int8, count)
+		for i := range out {
+			out[i] = int8(b[i])
+		}
+		return out, nil
+	case typeInt16:
+		b, err := read(2)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]int16, count)
+		for i := range out {
+			out[i] = int16(binary.LittleEndian.Uint16(b[i*2:]))
+		}
+		return out, nil
+	case typeInt32:
+		b, err := read(4)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]int32, count)
+		for i := range out {
+			out[i] = int32(binary.LittleEndian.Uint32(b[i*4:]))
+		}
+		return out, nil
+	case typeInt64:
+		b, err := read(8)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]int64, count)
+		for i := range out {
+			out[i] = int64(binary.LittleEndian.Uint64(b[i*8:]))
+		}
+		return out, nil
+	case typeUint8:
+		b, err := read(1)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]uint8, count)
+		copy(out, b)
+		return out, nil
+	case typeUint16:
+		b, err := read(2)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]uint16, count)
+		for i := range out {
+			out[i] = binary.LittleEndian.Uint16(b[i*2:])
+		}
+		return out, nil
+	case typeUint32:
+		b, err := read(4)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]uint32, count)
+		for i := range out {
+			out[i] = binary.LittleEndian.Uint32(b[i*4:])
+		}
+		return out, nil
+	case typeUint64:
+		b, err := read(8)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]uint64, count)
+		for i := range out {
+			out[i] = binary.LittleEndian.Uint64(b[i*8:])
+		}
+		return out, nil
+	case typeFloat32:
+		b, err := read(4)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]float32, count)
+		for i := range out {
+			out[i] = math.Float32frombits(binary.LittleEndian.Uint32(b[i*4:]))
+		}
+		return out, nil
+	case typeFloat64:
+		b, err := read(8)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]float64, count)
+		for i := range out {
+			out[i] = math.Float64frombits(binary.LittleEndian.Uint64(b[i*8:]))
+		}
+		return out, nil
+	}
+	return nil, fmt.Errorf("unknown typed array type byte: 0x%02X", typeByte)
 }

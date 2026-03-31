@@ -23,4 +23,16 @@ const (
 	tagSize    = 0x8B
 	typedArray = 0x84
 	floatF64   = 0xBA
+
+	// typed integer/float type bytes (used in TypedArray)
+	typeInt8    = 0xB0
+	typeInt16   = 0xB1
+	typeInt32   = 0xB2
+	typeInt64   = 0xB3
+	typeUint8   = 0xB4
+	typeUint16  = 0xB5
+	typeUint32  = 0xB6
+	typeUint64  = 0xB7
+	typeFloat32 = 0xB9
+	typeFloat64 = 0xBA // same as floatF64
 )
