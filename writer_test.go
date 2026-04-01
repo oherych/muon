@@ -117,11 +117,16 @@ var (
 			tokens:  []Token{{A: tokenListStart}, {A: tokenFalse}, {A: tokenTrue}, {A: tokenListEnd}},
 		},
 
-		//"map": {
-		//	golang:  map[string]string{"a": "b"},
-		//	encoded: []byte{dictStart, 0x62, stringEnd, 0x61, stringEnd, dictEnd},
-		//	tokens:  []Token{{A: tokenDictStart}, {A: TokenString, Data: []byte{0x62}}, {A: TokenString, Data: []byte{0x61}}, {A: tokenDictEnd}},
-		//},
+		"map_string": {
+			golang:  map[string]string{"a": "b"},
+			encoded: []byte{dictStart, 'a', stringEnd, 'b', stringEnd, dictEnd},
+			tokens:  []Token{{A: tokenDictStart}, {A: TokenString, Data: "a"}, {A: TokenString, Data: "b"}, {A: tokenDictEnd}},
+		},
+		"map_int64_key": {
+			golang:  map[int64]string{10: "z"},
+			encoded: []byte{dictStart, typeInt64, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 'z', stringEnd, dictEnd},
+			tokens:  []Token{{A: tokenDictStart}, {A: tokenInt, Data: int64(10)}, {A: TokenString, Data: "z"}, {A: tokenDictEnd}},
+		},
 
 		"float64_pi": {
 			golang:  math.Pi,

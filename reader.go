@@ -51,6 +51,43 @@ func (r *Reader) Next() (Token, error) {
 		return Token{A: tokenInt, Data: int(first - 0xA0)}, nil
 	}
 
+	// typed LE integers: 0xB0..0xB7
+	if first >= typeInt8 && first <= typeUint64 {
+		sizes := [8]int{1, 2, 4, 8, 1, 2, 4, 8} // B0..B7
+		size := sizes[first-typeInt8]
+		if r.scanp+size > len(r.in) {
+			return Token{}, io.EOF
+		}
+		b := r.in[r.scanp : r.scanp+size]
+		r.scanp += size
+		signed := first <= typeInt64
+		switch size {
+		case 1:
+			if signed {
+				return Token{A: tokenInt, Data: int(int8(b[0]))}, nil
+			}
+			return Token{A: tokenInt, Data: int(b[0])}, nil
+		case 2:
+			v := binary.LittleEndian.Uint16(b)
+			if signed {
+				return Token{A: tokenInt, Data: int(int16(v))}, nil
+			}
+			return Token{A: tokenInt, Data: int(v)}, nil
+		case 4:
+			v := binary.LittleEndian.Uint32(b)
+			if signed {
+				return Token{A: tokenInt, Data: int(int32(v))}, nil
+			}
+			return Token{A: tokenInt, Data: int(v)}, nil
+		case 8:
+			v := binary.LittleEndian.Uint64(b)
+			if signed {
+				return Token{A: tokenInt, Data: int64(v)}, nil
+			}
+			return Token{A: tokenInt, Data: uint64(v)}, nil
+		}
+	}
+
 	// signed LEB128 integer
 	if first == 0xBB {
 		v, n := leb128.DecodeSleb128(r.in[r.scanp:])

@@ -223,28 +223,111 @@ func (e Encoder) writeTypedElem(w io.Writer, rv reflect.Value, typeByte byte) er
 }
 
 func (e Encoder) writeMap(w io.Writer, rv reflect.Value) error {
-	if err := e.writeBytes(w, []byte{dictStart}); err != nil {
+	keys := rv.MapKeys()
+	if len(keys) == 0 {
+		return e.writeBytes(w, []byte{dictStart, dictEnd})
+	}
+
+	// validate all keys are same kind-class (all strings or all integers)
+	firstKind := keys[0].Kind()
+	isString := firstKind == reflect.String
+	isInt := firstKind >= reflect.Int && firstKind <= reflect.Int64 ||
+		firstKind >= reflect.Uint && firstKind <= reflect.Uint64
+	if !isString && !isInt {
+		return fmt.Errorf("dict keys must be string or integer, got %s", firstKind)
+	}
+	for _, k := range keys[1:] {
+		kk := k.Kind()
+		if isString && kk != reflect.String {
+			return fmt.Errorf("mixed dict key types: expected string, got %s", kk)
+		}
+		if isInt {
+			isKInt := kk >= reflect.Int && kk <= reflect.Int64 ||
+				kk >= reflect.Uint && kk <= reflect.Uint64
+			if !isKInt {
+				return fmt.Errorf("mixed dict key types: expected integer, got %s", kk)
+			}
+		}
+	}
+
+	if err := e.writeByte(w, dictStart); err != nil {
 		return err
 	}
 
-	for _, k := range rv.MapKeys() {
-		iv := rv.MapIndex(k)
-		// TODO: type validation
-
-		if err := e.write(w, iv.Interface()); err != nil {
-			return err
+	for i, k := range keys {
+		if isInt {
+			if err := e.writeDictIntKey(w, k, i == 0); err != nil {
+				return err
+			}
+		} else {
+			if err := e.writeString(w, k.String()); err != nil {
+				return err
+			}
 		}
-
-		if err := e.write(w, k.Interface()); err != nil {
+		if err := e.write(w, rv.MapIndex(k).Interface()); err != nil {
 			return err
 		}
 	}
 
-	if err := e.writeBytes(w, []byte{dictEnd}); err != nil {
-		return err
+	return e.writeByte(w, dictEnd)
+}
+
+func (e Encoder) writeDictIntKey(w io.Writer, rv reflect.Value, first bool) error {
+	kind := rv.Kind()
+	isUint := kind >= reflect.Uint && kind <= reflect.Uint64
+
+	// determine typed LE type byte if applicable
+	var typeByte byte
+	var leSize int
+	switch kind {
+	case reflect.Int8, reflect.Uint8:
+		typeByte, leSize = typeInt8, 1
+		if kind == reflect.Uint8 {
+			typeByte = typeUint8
+		}
+	case reflect.Int16, reflect.Uint16:
+		typeByte, leSize = typeInt16, 2
+		if kind == reflect.Uint16 {
+			typeByte = typeUint16
+		}
+	case reflect.Int32, reflect.Uint32:
+		typeByte, leSize = typeInt32, 4
+		if kind == reflect.Uint32 {
+			typeByte = typeUint32
+		}
+	case reflect.Int64, reflect.Uint64:
+		typeByte, leSize = typeInt64, 8
+		if kind == reflect.Uint64 {
+			typeByte = typeUint64
+		}
 	}
 
-	return nil
+	if leSize > 0 {
+		// fixed-width LE integer key
+		if first {
+			if err := e.writeByte(w, typeByte); err != nil {
+				return err
+			}
+		}
+		var buf [8]byte
+		if isUint {
+			binary.LittleEndian.PutUint64(buf[:], rv.Uint())
+		} else {
+			binary.LittleEndian.PutUint64(buf[:], uint64(rv.Int()))
+		}
+		return e.writeBytes(w, buf[:leSize])
+	}
+
+	// int / uint (platform-dependent): use SLEB128, omit 0xBB prefix after first key
+	if first {
+		if err := e.writeByte(w, 0xBB); err != nil {
+			return err
+		}
+	}
+	if isUint {
+		return e.writeBytes(w, leb128.AppendSleb128(nil, int64(rv.Uint())))
+	}
+	return e.writeBytes(w, leb128.AppendSleb128(nil, rv.Int()))
 }
 
 func (e Encoder) writeStruct(w io.Writer, rv reflect.Value) error {

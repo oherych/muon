@@ -32,11 +32,13 @@ Spec reference: https://github.com/vshymanskyy/muon
 - [x] `reader.go`: handle `0x84` → `readTypedElems()` → `TokenTypedArray` with typed Go slice
 - [x] `writer_test.go`: `byte_slice` updated to TypedArray encoding; added `typed_array_int32`, `typed_array_float64`
 
-## Phase 3 — Dict completeness
+## Phase 3 — Dict completeness ✅ DONE
 
-- [ ] `writer.go`: `writeMap()` — validate all keys same type, return error if mixed
-- [ ] `writer.go`: integer key dict — first key with type prefix, subsequent without
-- [ ] `writer_test.go`: activate commented-out `map` test; add `map[int]string` test
+- [x] `writer.go`: fix key-value order in `writeMap()` (was value-first, now key-first per spec)
+- [x] `writer.go`: validate all keys same kind-class (string or integer), return error if mixed
+- [x] `writer.go`: `writeDictIntKey()` — first key with type prefix (`0xB0..0xB7` or `0xBB`), subsequent without
+- [x] `reader.go`: add typed LE integer decoding (`0xB0..0xB7`) → tokenInt
+- [x] `writer_test.go`: replace commented `map` test with `map_string`; add `map_int64_key`
 
 ## Phase 4 — Tags (magic, count, size, padding)
 
