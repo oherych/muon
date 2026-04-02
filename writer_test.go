@@ -203,6 +203,49 @@ func TestWrite(t *testing.T) {
 	}
 }
 
+func TestWriteMagic(t *testing.T) {
+	var buf bytes.Buffer
+	err := (Encoder{}).WriteWithMagic(&buf, true)
+	assert.Nil(t, err)
+	assert.Equal(t, []byte{tagMagicByte, 0xB5, 0x30, 0x31, boolTrue}, buf.Bytes())
+}
+
+func TestWritePadding(t *testing.T) {
+	var buf bytes.Buffer
+	err := (Encoder{}).WritePadding(&buf, 3)
+	assert.Nil(t, err)
+	assert.Equal(t, []byte{tagPadding, tagPadding, tagPadding}, buf.Bytes())
+}
+
+func TestReaderMagicAndPadding(t *testing.T) {
+	// padding + magic + value
+	in := []byte{tagPadding, tagPadding, tagMagicByte, 0xB5, 0x30, 0x31, boolTrue}
+	r := NewByteReader(in)
+
+	tok, err := r.Next()
+	assert.Nil(t, err)
+	assert.Equal(t, TokenMagic, tok.A)
+
+	tok, err = r.Next()
+	assert.Nil(t, err)
+	assert.Equal(t, tokenTrue, tok.A)
+}
+
+func TestReaderCountTag(t *testing.T) {
+	// count(3) before a list
+	in := []byte{tagCount, 0x03, listStart, boolTrue, boolFalse, nilValue, listEnd}
+	r := NewByteReader(in)
+
+	tok, err := r.Next()
+	assert.Nil(t, err)
+	assert.Equal(t, TokenCount, tok.A)
+	assert.Equal(t, uint64(3), tok.Data)
+
+	tok, err = r.Next()
+	assert.Nil(t, err)
+	assert.Equal(t, tokenListStart, tok.A)
+}
+
 func BenchmarkWrite(b *testing.B) {
 	for testCase, tt := range tests {
 		var writer DummyWriter

@@ -38,6 +38,24 @@ func (e Encoder) Write(w io.Writer, in interface{}) error {
 	return e.write(w, in)
 }
 
+var magic = []byte{tagMagicByte, 0xB5, 0x30, 0x31}
+
+func (e Encoder) WriteWithMagic(w io.Writer, in interface{}) error {
+	if err := e.writeBytes(w, magic); err != nil {
+		return err
+	}
+	return e.write(w, in)
+}
+
+func (Encoder) WritePadding(w io.Writer, n int) error {
+	pad := make([]byte, n)
+	for i := range pad {
+		pad[i] = tagPadding
+	}
+	_, err := w.Write(pad)
+	return err
+}
+
 func (e Encoder) write(w io.Writer, in interface{}) error {
 	if m, ok := in.(Marshaler); ok {
 		data, err := m.MarshalMuon()

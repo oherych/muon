@@ -21,8 +21,13 @@ const (
 	positiveInfValue = 0xAF // +Inf
 
 	tagSize    = 0x8B
+	tagCount   = 0x8A
+	tagPadding = 0xFF
 	typedArray = 0x84
 	floatF64   = 0xBA
+
+	// magic signature bytes (after the 0x8F tag byte)
+	tagMagicByte = 0x8F
 
 	// typed integer/float type bytes (used in TypedArray)
 	typeInt8    = 0xB0

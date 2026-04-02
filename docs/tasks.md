@@ -40,13 +40,14 @@ Spec reference: https://github.com/vshymanskyy/muon
 - [x] `reader.go`: add typed LE integer decoding (`0xB0..0xB7`) → tokenInt
 - [x] `writer_test.go`: replace commented `map` test with `map_string`; add `map_int64_key`
 
-## Phase 4 — Tags (magic, count, size, padding)
+## Phase 4 — Tags (magic, count, padding) ✅ DONE
 
-- [ ] `consts.go`: add `tagMagic`, `tagCount = 0x8A`, `tagPadding = 0xFF`
-- [ ] `writer.go`: `WriteWithMagic()` method
-- [ ] `writer.go`: `WritePadding(w, n)` utility
-- [ ] `reader.go`: skip `0xFF` padding in `Next()`
-- [ ] `reader.go`: handle `0x8F` magic and `0x8A` count tag
+- [x] `consts.go`: add `tagMagicByte = 0x8F`, `tagCount = 0x8A`, `tagPadding = 0xFF`
+- [x] `token.go`: add `TokenMagic`, `TokenCount`
+- [x] `writer.go`: `WriteWithMagic()` — writes `0x8F 0xB5 0x30 0x31` then value
+- [x] `writer.go`: `WritePadding(w, n)` — writes n bytes of `0xFF`
+- [x] `reader.go`: skip leading `0xFF` padding bytes before each token
+- [x] `reader.go`: handle `0x8F` magic → `TokenMagic`; `0x8A` count tag → `TokenCount`
 
 ## Phase 5 — LRU String References
 

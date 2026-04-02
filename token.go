@@ -12,6 +12,8 @@ const (
 	tokenInt       TokenEnum = "int"
 	TokenFloat      TokenEnum = "float"
 	TokenTypedArray TokenEnum = "typed_array"
+	TokenMagic      TokenEnum = "magic"
+	TokenCount      TokenEnum = "count"
 )
 
 var (

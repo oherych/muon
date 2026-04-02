@@ -24,12 +24,33 @@ func NewByteReader(in []byte) Reader {
 }
 
 func (r *Reader) Next() (Token, error) {
+	// skip padding bytes
+	for r.scanp < len(r.in) && r.in[r.scanp] == tagPadding {
+		r.scanp++
+	}
+
 	if r.scanp >= len(r.in) {
 		return Token{}, io.EOF
 	}
 
 	first := r.in[r.scanp]
 	r.scanp++
+
+	// magic signature: 0x8F 0xB5 0x30 0x31
+	if first == tagMagicByte {
+		if r.scanp+3 > len(r.in) {
+			return Token{}, io.EOF
+		}
+		r.scanp += 3 // skip 0xB5 0x30 0x31
+		return Token{A: TokenMagic}, nil
+	}
+
+	// count tag: 0x8A + ULEB128
+	if first == tagCount {
+		n, size := leb128.DecodeUleb128(r.in[r.scanp:])
+		r.scanp += int(size)
+		return Token{A: TokenCount, Data: n}, nil
+	}
 
 	if token, ok := tokenMapping[first]; ok {
 		return Token{A: token}, nil
