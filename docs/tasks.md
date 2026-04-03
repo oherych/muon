@@ -49,13 +49,16 @@ Spec reference: https://github.com/vshymanskyy/muon
 - [x] `reader.go`: skip leading `0xFF` padding bytes before each token
 - [x] `reader.go`: handle `0x8F` magic → `TokenMagic`; `0x8A` count tag → `TokenCount`
 
-## Phase 5 — LRU String References
+## Phase 5 — LRU String References + Chunked TypedArray ✅ DONE
 
-- [ ] `writer.go`: `Encoder` gets `lru []string` (max 512), write `0x81` + index if found
-- [ ] `reader.go`: `Reader` gets `lru []string`, handle `0x8C` and `0x81`
+- [x] `consts.go`: add `tagRefString = 0x8C`, `stringRef = 0x81`, `typedArrayChunk = 0x85`
+- [x] `writer.go`: `Encoder` becomes stateful with pointer receivers; `LRU bool` field
+- [x] `writer.go`: `writeString()` checks LRU — writes `0x8C` + string on first occurrence, `0x81` + index on repeat
+- [x] `writer.go`: `WriteChunkedTypedArray(w, typeByte, chunks...)` — `0x85` + type + chunks + `0x00`
+- [x] `reader.go`: `Reader` gets `lru []string`; handles `0x8C` (add to LRU), `0x81` (lookup by index)
+- [x] `reader.go`: handles `0x85` chunked TypedArray — aggregates all chunks into single typed slice
 
 ## Phase 6 — Advanced
 
 - [ ] Deterministic encoding mode (`Encoder{Deterministic: true}`)
-- [ ] Chunked TypedArray (`0x85`)
 - [ ] Streaming/Chaining decoder

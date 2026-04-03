@@ -12,6 +12,7 @@ import (
 type Reader struct {
 	in    []byte
 	scanp int
+	lru   []string
 }
 
 type Token struct {
@@ -134,6 +135,44 @@ func (r *Reader) Next() (Token, error) {
 		bits := binary.LittleEndian.Uint32(r.in[r.scanp:])
 		r.scanp += 4
 		return Token{A: TokenFloat, Data: float64(math.Float32frombits(bits))}, nil
+	}
+
+	// chunked TypedArray: 0x85 + type_byte + (ULEB128(n) + n×bytes)* + ULEB128(0)
+	if first == typedArrayChunk {
+		if r.scanp >= len(r.in) {
+			return Token{}, io.EOF
+		}
+		typeByte := r.in[r.scanp]
+		r.scanp++
+		data, err := r.readChunkedTypedElems(typeByte)
+		if err != nil {
+			return Token{}, err
+		}
+		return Token{A: TokenTypedArray, Data: data}, nil
+	}
+
+	// string reference: 0x81 + ULEB128(index) → LRU lookup
+	if first == stringRef {
+		idx, n := leb128.DecodeUleb128(r.in[r.scanp:])
+		r.scanp += int(n)
+		if int(idx) >= len(r.lru) {
+			return Token{}, fmt.Errorf("string ref index %d out of range (lru size %d)", idx, len(r.lru))
+		}
+		return Token{A: TokenString, Data: r.lru[idx]}, nil
+	}
+
+	// referenced string tag: 0x8C — read next string and add to LRU
+	if first == tagRefString {
+		tok, err := r.Next()
+		if err != nil {
+			return Token{}, err
+		}
+		if tok.A != TokenString {
+			return Token{}, fmt.Errorf("0x8C tag must be followed by a string, got %s", tok.A)
+		}
+		s := tok.Data.(string)
+		r.lruPrepend(s)
+		return tok, nil
 	}
 
 	// TypedArray: 0x84 + type_byte + ULEB128(count) + packed LE bytes
@@ -294,4 +333,98 @@ func (r *Reader) readTypedElems(typeByte byte, count int) (interface{}, error) {
 		return out, nil
 	}
 	return nil, fmt.Errorf("unknown typed array type byte: 0x%02X", typeByte)
+}
+
+func (r *Reader) readChunkedTypedElems(typeByte byte) (interface{}, error) {
+	// read chunks until zero-length terminator, aggregate into one slice
+	var allElems []interface{}
+	for {
+		count, n := leb128.DecodeUleb128(r.in[r.scanp:])
+		r.scanp += int(n)
+		if count == 0 {
+			break
+		}
+		chunk, err := r.readTypedElems(typeByte, int(count))
+		if err != nil {
+			return nil, err
+		}
+		allElems = append(allElems, chunk)
+	}
+	if len(allElems) == 0 {
+		return r.readTypedElems(typeByte, 0)
+	}
+	return mergeTypedSlices(allElems), nil
+}
+
+func mergeTypedSlices(chunks []interface{}) interface{} {
+	switch chunks[0].(type) {
+	case []int8:
+		var out []int8
+		for _, c := range chunks {
+			out = append(out, c.([]int8)...)
+		}
+		return out
+	case []int16:
+		var out []int16
+		for _, c := range chunks {
+			out = append(out, c.([]int16)...)
+		}
+		return out
+	case []int32:
+		var out []int32
+		for _, c := range chunks {
+			out = append(out, c.([]int32)...)
+		}
+		return out
+	case []int64:
+		var out []int64
+		for _, c := range chunks {
+			out = append(out, c.([]int64)...)
+		}
+		return out
+	case []uint8:
+		var out []uint8
+		for _, c := range chunks {
+			out = append(out, c.([]uint8)...)
+		}
+		return out
+	case []uint16:
+		var out []uint16
+		for _, c := range chunks {
+			out = append(out, c.([]uint16)...)
+		}
+		return out
+	case []uint32:
+		var out []uint32
+		for _, c := range chunks {
+			out = append(out, c.([]uint32)...)
+		}
+		return out
+	case []uint64:
+		var out []uint64
+		for _, c := range chunks {
+			out = append(out, c.([]uint64)...)
+		}
+		return out
+	case []float32:
+		var out []float32
+		for _, c := range chunks {
+			out = append(out, c.([]float32)...)
+		}
+		return out
+	case []float64:
+		var out []float64
+		for _, c := range chunks {
+			out = append(out, c.([]float64)...)
+		}
+		return out
+	}
+	return chunks[0]
+}
+
+func (r *Reader) lruPrepend(s string) {
+	if len(r.lru) >= lruMaxSize {
+		r.lru = r.lru[:lruMaxSize-1]
+	}
+	r.lru = append([]string{s}, r.lru...)
 }

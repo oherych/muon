@@ -195,7 +195,8 @@ func TestWrite(t *testing.T) {
 		t.Run(testCase, func(t *testing.T) {
 			var writer bytes.Buffer
 
-			err := (Encoder{}).Write(&writer, tt.golang)
+			var enc Encoder
+			err := enc.Write(&writer, tt.golang)
 
 			assert.Equal(t, tt.encoded, writer.Bytes())
 			assert.Nil(t, err)
@@ -205,16 +206,78 @@ func TestWrite(t *testing.T) {
 
 func TestWriteMagic(t *testing.T) {
 	var buf bytes.Buffer
-	err := (Encoder{}).WriteWithMagic(&buf, true)
+	var enc Encoder
+	err := enc.WriteWithMagic(&buf, true)
 	assert.Nil(t, err)
 	assert.Equal(t, []byte{tagMagicByte, 0xB5, 0x30, 0x31, boolTrue}, buf.Bytes())
 }
 
 func TestWritePadding(t *testing.T) {
 	var buf bytes.Buffer
-	err := (Encoder{}).WritePadding(&buf, 3)
+	var enc Encoder
+	err := enc.WritePadding(&buf, 3)
 	assert.Nil(t, err)
 	assert.Equal(t, []byte{tagPadding, tagPadding, tagPadding}, buf.Bytes())
+}
+
+func TestLRUStringRefs(t *testing.T) {
+	var buf bytes.Buffer
+	enc := Encoder{LRU: true}
+
+	// write two values referencing the same strings
+	err := enc.Write(&buf, []interface{}{"foo", "bar", "foo"})
+	assert.Nil(t, err)
+
+	// first "foo": 0x8C tag + "foo\x00"
+	// "bar": 0x8C tag + "bar\x00"
+	// second "foo": 0x81 + ULEB128(1)  (foo is at index 1: bar=0, foo=1)
+	expected := []byte{
+		listStart,
+		tagRefString, 'f', 'o', 'o', stringEnd,
+		tagRefString, 'b', 'a', 'r', stringEnd,
+		stringRef, 0x01,
+		listEnd,
+	}
+	assert.Equal(t, expected, buf.Bytes())
+
+	// reader should reconstruct original strings
+	r := NewByteReader(buf.Bytes())
+	tokens := []Token{}
+	for {
+		tok, err := r.Next()
+		if err != nil {
+			break
+		}
+		tokens = append(tokens, tok)
+	}
+	assert.Equal(t, []Token{
+		{A: tokenListStart},
+		{A: TokenString, Data: "foo"},
+		{A: TokenString, Data: "bar"},
+		{A: TokenString, Data: "foo"},
+		{A: tokenListEnd},
+	}, tokens)
+}
+
+func TestChunkedTypedArray(t *testing.T) {
+	var buf bytes.Buffer
+	var enc Encoder
+	err := enc.WriteChunkedTypedArray(&buf, typeInt32, []int32{1, 2}, []int32{3, 4})
+	assert.Nil(t, err)
+
+	expected := []byte{
+		typedArrayChunk, typeInt32,
+		0x02, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
+		0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,
+		0x00,
+	}
+	assert.Equal(t, expected, buf.Bytes())
+
+	r := NewByteReader(buf.Bytes())
+	tok, err := r.Next()
+	assert.Nil(t, err)
+	assert.Equal(t, TokenTypedArray, tok.A)
+	assert.Equal(t, []int32{1, 2, 3, 4}, tok.Data)
 }
 
 func TestReaderMagicAndPadding(t *testing.T) {

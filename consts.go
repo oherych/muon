@@ -20,10 +20,13 @@ const (
 	negativeInfValue = 0xAE // -Inf
 	positiveInfValue = 0xAF // +Inf
 
-	tagSize    = 0x8B
-	tagCount   = 0x8A
-	tagPadding = 0xFF
-	typedArray = 0x84
+	tagSize         = 0x8B
+	tagCount        = 0x8A
+	tagPadding      = 0xFF
+	tagRefString    = 0x8C
+	stringRef       = 0x81
+	typedArray      = 0x84
+	typedArrayChunk = 0x85
 	floatF64   = 0xBA
 
 	// magic signature bytes (after the 0x8F tag byte)
