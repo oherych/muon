@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 	"reflect"
+	"sort"
 	"strings"
 
 	"ekyu.moe/leb128"
@@ -37,7 +38,9 @@ type Encoder struct {
 	// LRU enables string reference deduplication. When true, repeated strings
 	// are written as back-references (0x81 + index) instead of full strings.
 	LRU bool
-	lru []string
+	// Deterministic enforces canonical encoding: sorted dict keys, LRU disabled.
+	Deterministic bool
+	lru           []string
 }
 
 func (e *Encoder) Write(w io.Writer, in interface{}) error {
@@ -179,7 +182,7 @@ func (e *Encoder) writeFloat(w io.Writer, rv reflect.Value) error {
 }
 
 func (e *Encoder) writeString(w io.Writer, v string) error {
-	if e.LRU {
+	if e.LRU && !e.Deterministic {
 		for i, s := range e.lru {
 			if s == v {
 				return e.writeBytes(w, []byte{stringRef}, leb128.AppendUleb128(nil, uint64(i)))
@@ -296,6 +299,22 @@ func (e *Encoder) writeMap(w io.Writer, rv reflect.Value) error {
 			if !isKInt {
 				return fmt.Errorf("mixed dict key types: expected integer, got %s", kk)
 			}
+		}
+	}
+
+	if e.Deterministic {
+		if isString {
+			sort.Slice(keys, func(i, j int) bool {
+				return keys[i].String() < keys[j].String()
+			})
+		} else {
+			sort.Slice(keys, func(i, j int) bool {
+				ki, kj := keys[i], keys[j]
+				if ki.Kind() >= reflect.Uint && ki.Kind() <= reflect.Uint64 {
+					return ki.Uint() < kj.Uint()
+				}
+				return ki.Int() < kj.Int()
+			})
 		}
 	}
 

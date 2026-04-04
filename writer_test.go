@@ -2,6 +2,7 @@ package muon
 
 import (
 	"bytes"
+	"io"
 	"math"
 	"testing"
 
@@ -307,6 +308,146 @@ func TestReaderCountTag(t *testing.T) {
 	tok, err = r.Next()
 	assert.Nil(t, err)
 	assert.Equal(t, tokenListStart, tok.A)
+}
+
+func TestDeterministicMapOrdering(t *testing.T) {
+	enc := Encoder{Deterministic: true}
+
+	// string keys must be sorted alphabetically
+	m := map[string]int{"c": 3, "a": 1, "b": 2}
+	var buf bytes.Buffer
+	assert.Nil(t, enc.Write(&buf, m))
+
+	r := NewByteReader(buf.Bytes())
+	var keys []string
+	tok, _ := r.Next() // dictStart
+	assert.Equal(t, tokenDictStart, tok.A)
+	for {
+		tok, err := r.Next()
+		assert.Nil(t, err)
+		if tok.A == tokenDictEnd {
+			break
+		}
+		assert.Equal(t, TokenString, tok.A)
+		keys = append(keys, tok.Data.(string))
+		r.Next() // value
+	}
+	assert.Equal(t, []string{"a", "b", "c"}, keys)
+}
+
+func TestDeterministicDisablesLRU(t *testing.T) {
+	enc := Encoder{LRU: true, Deterministic: true}
+	var buf bytes.Buffer
+	// write same string twice — must NOT emit 0x8C or 0x81 references
+	type S struct {
+		A string
+		B string
+	}
+	assert.Nil(t, enc.Write(&buf, S{A: "hello", B: "hello"}))
+	b := buf.Bytes()
+	for _, by := range b {
+		assert.NotEqual(t, tagRefString, by, "0x8C must not appear in deterministic mode")
+		assert.NotEqual(t, stringRef, by, "0x81 must not appear in deterministic mode")
+	}
+}
+
+func TestDecoder(t *testing.T) {
+	t.Run("nil", func(t *testing.T) {
+		var buf bytes.Buffer
+		var enc Encoder
+		enc.Write(&buf, nil)
+		d := NewDecoder(buf.Bytes())
+		v, err := d.Decode()
+		assert.Nil(t, err)
+		assert.Nil(t, v)
+	})
+
+	t.Run("bool", func(t *testing.T) {
+		var buf bytes.Buffer
+		var enc Encoder
+		enc.Write(&buf, true)
+		d := NewDecoder(buf.Bytes())
+		v, err := d.Decode()
+		assert.Nil(t, err)
+		assert.Equal(t, true, v)
+	})
+
+	t.Run("int", func(t *testing.T) {
+		var buf bytes.Buffer
+		var enc Encoder
+		enc.Write(&buf, 42)
+		d := NewDecoder(buf.Bytes())
+		v, err := d.Decode()
+		assert.Nil(t, err)
+		assert.Equal(t, 42, v)
+	})
+
+	t.Run("string", func(t *testing.T) {
+		var buf bytes.Buffer
+		var enc Encoder
+		enc.Write(&buf, "hello")
+		d := NewDecoder(buf.Bytes())
+		v, err := d.Decode()
+		assert.Nil(t, err)
+		assert.Equal(t, "hello", v)
+	})
+
+	t.Run("float", func(t *testing.T) {
+		var buf bytes.Buffer
+		var enc Encoder
+		enc.Write(&buf, math.Pi)
+		d := NewDecoder(buf.Bytes())
+		v, err := d.Decode()
+		assert.Nil(t, err)
+		assert.InDelta(t, math.Pi, v.(float64), 1e-10)
+	})
+
+	t.Run("list", func(t *testing.T) {
+		var buf bytes.Buffer
+		var enc Encoder
+		// use []interface{} to avoid TypedArray path
+		enc.Write(&buf, []interface{}{"a", "b"})
+		d := NewDecoder(buf.Bytes())
+		v, err := d.Decode()
+		assert.Nil(t, err)
+		assert.Equal(t, []interface{}{"a", "b"}, v)
+	})
+
+	t.Run("dict", func(t *testing.T) {
+		var buf bytes.Buffer
+		enc := Encoder{Deterministic: true}
+		enc.Write(&buf, map[string]interface{}{"x": 1})
+		d := NewDecoder(buf.Bytes())
+		v, err := d.Decode()
+		assert.Nil(t, err)
+		assert.Equal(t, map[string]interface{}{"x": 1}, v)
+	})
+
+	t.Run("chaining", func(t *testing.T) {
+		var buf bytes.Buffer
+		var enc Encoder
+		enc.Write(&buf, 1)
+		enc.Write(&buf, 2)
+		enc.Write(&buf, 3)
+		d := NewDecoder(buf.Bytes())
+		for _, expected := range []int{1, 2, 3} {
+			v, err := d.Decode()
+			assert.Nil(t, err)
+			assert.Equal(t, expected, v)
+		}
+		_, err := d.Decode()
+		assert.Equal(t, io.EOF, err)
+	})
+
+	t.Run("magic_skipped", func(t *testing.T) {
+		var buf bytes.Buffer
+		var enc Encoder
+		enc.WriteWithMagic(&buf, "value")
+		d := NewDecoder(buf.Bytes())
+		v, err := d.Decode()
+		assert.Nil(t, err)
+		assert.Equal(t, "value", v)
+	})
 }
 
 func BenchmarkWrite(b *testing.B) {

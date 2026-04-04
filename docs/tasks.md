@@ -58,7 +58,7 @@ Spec reference: https://github.com/vshymanskyy/muon
 - [x] `reader.go`: `Reader` gets `lru []string`; handles `0x8C` (add to LRU), `0x81` (lookup by index)
 - [x] `reader.go`: handles `0x85` chunked TypedArray — aggregates all chunks into single typed slice
 
-## Phase 6 — Advanced
+## Phase 6 — Advanced ✅ DONE
 
-- [ ] Deterministic encoding mode (`Encoder{Deterministic: true}`)
-- [ ] Streaming/Chaining decoder
+- [x] Deterministic encoding mode (`Encoder{Deterministic: true}`)
+- [x] Streaming/Chaining decoder
