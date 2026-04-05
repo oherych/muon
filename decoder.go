@@ -9,6 +9,7 @@ type Decoder struct {
 	r Reader
 }
 
+// NewDecoder creates a Decoder that reads from data.
 func NewDecoder(data []byte) *Decoder {
 	return &Decoder{r: NewByteReader(data)}
 }

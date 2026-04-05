@@ -34,21 +34,41 @@ var (
 	}
 )
 
+// Encoder serializes Go values to the muon binary format.
+//
+// The zero value is ready to use. Fields may be set before the first call:
+//
+//	enc := muon.Encoder{LRU: true}
+//	enc.Write(&buf, value)
+//
+// Encoder is stateful when LRU is enabled — reuse the same instance across
+// multiple Write calls to share the string deduplication table.
 type Encoder struct {
 	// LRU enables string reference deduplication. When true, repeated strings
 	// are written as back-references (0x81 + index) instead of full strings.
+	// The LRU table holds at most 512 entries. Ignored when Deterministic is set.
 	LRU bool
-	// Deterministic enforces canonical encoding: sorted dict keys, LRU disabled.
+	// Deterministic enforces canonical encoding: dict keys are sorted
+	// (strings alphabetically, integers numerically) and LRU is disabled.
+	// The same input always produces identical bytes.
 	Deterministic bool
 	lru           []string
 }
 
+// Write encodes in and writes the muon bytes to w.
+// Supported types: nil, bool, int/uint (all sizes), float32/64, string,
+// slice, array, map (string or integer keys), struct, and pointer.
+// Types implementing [Marshaler] or [MarshalerStream] are encoded via those
+// interfaces. Returns an error for unsupported types or write failures.
 func (e *Encoder) Write(w io.Writer, in interface{}) error {
 	return e.write(w, in)
 }
 
 var magic = []byte{tagMagicByte, 0xB5, 0x30, 0x31}
 
+// WriteWithMagic prepends the muon file signature (0x8F µ01) and then writes
+// the encoded value. Use this at the start of a file or stream so readers can
+// reliably detect the muon format.
 func (e *Encoder) WriteWithMagic(w io.Writer, in interface{}) error {
 	if err := e.writeBytes(w, magic); err != nil {
 		return err
@@ -56,6 +76,9 @@ func (e *Encoder) WriteWithMagic(w io.Writer, in interface{}) error {
 	return e.write(w, in)
 }
 
+// WritePadding writes n padding bytes (0xFF) to w. Padding is ignored by
+// readers and can be used for memory alignment or as a stream keep-alive
+// signal.
 func (e *Encoder) WritePadding(w io.Writer, n int) error {
 	pad := make([]byte, n)
 	for i := range pad {
@@ -65,8 +88,10 @@ func (e *Encoder) WritePadding(w io.Writer, n int) error {
 	return err
 }
 
-// WriteChunkedTypedArray writes a chunked TypedArray (0x85).
-// Each argument must be a slice of the type corresponding to typeByte.
+// WriteChunkedTypedArray writes a chunked TypedArray (0x85 tag).
+// Each chunk must be a slice whose element type matches typeByte
+// (one of the typeInt8…typeFloat64 constants).
+// The reader reassembles all chunks into a single typed slice.
 func (e *Encoder) WriteChunkedTypedArray(w io.Writer, typeByte byte, chunks ...interface{}) error {
 	if err := e.writeBytes(w, []byte{typedArrayChunk, typeByte}); err != nil {
 		return err

@@ -9,6 +9,10 @@ import (
 	"ekyu.moe/leb128"
 )
 
+// Reader is a low-level, token-based muon decoder.
+// It reads one token at a time from an in-memory byte slice.
+// Use [NewByteReader] to create a Reader, then call [Reader.Next] in a loop.
+// For high-level value reconstruction, prefer [Decoder].
 type Reader struct {
 	in             []byte
 	scanp          int
@@ -16,15 +20,22 @@ type Reader struct {
 	lastIntKeyType byte // type byte of the most recently decoded typed int key (0xB0..0xB7 or 0xBB)
 }
 
+// Token is a single decoded muon value returned by [Reader.Next].
+// A contains the token kind; Data holds the Go value (may be nil for
+// tokens that carry no payload, such as list/dict delimiters).
 type Token struct {
 	A    TokenEnum
 	Data interface{}
 }
 
+// NewByteReader creates a Reader that decodes from the given byte slice.
 func NewByteReader(in []byte) Reader {
 	return Reader{in: in}
 }
 
+// Next reads and returns the next token from the stream.
+// Returns io.EOF when all bytes have been consumed.
+// Padding bytes (0xFF) are silently skipped before each token.
 func (r *Reader) Next() (Token, error) {
 	// skip padding bytes
 	for r.scanp < len(r.in) && r.in[r.scanp] == tagPadding {
@@ -435,8 +446,10 @@ func mergeTypedSlices(chunks []interface{}) interface{} {
 	return chunks[0]
 }
 
-// NextIntKey reads the next dict integer key given the type byte of the first key.
-// Dict keys after the first have no type prefix — the caller must supply the type.
+// NextIntKey reads the next integer key in a dict whose first key had the given
+// typeByte (0xB0–0xB7 or 0xBB). Per the muon spec, only the first key in an
+// integer-keyed dict carries a type prefix; all subsequent keys are raw bytes
+// of the same size. Returns tokenDictEnd if the closing 0x93 byte is next.
 func (r *Reader) NextIntKey(typeByte byte) (Token, error) {
 	// skip padding
 	for r.scanp < len(r.in) && r.in[r.scanp] == tagPadding {
