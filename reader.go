@@ -10,9 +10,10 @@ import (
 )
 
 type Reader struct {
-	in    []byte
-	scanp int
-	lru   []string
+	in             []byte
+	scanp          int
+	lru            []string
+	lastIntKeyType byte // type byte of the most recently decoded typed int key (0xB0..0xB7 or 0xBB)
 }
 
 type Token struct {
@@ -75,6 +76,7 @@ func (r *Reader) Next() (Token, error) {
 
 	// typed LE integers: 0xB0..0xB7
 	if first >= typeInt8 && first <= typeUint64 {
+		r.lastIntKeyType = first
 		sizes := [8]int{1, 2, 4, 8, 1, 2, 4, 8} // B0..B7
 		size := sizes[first-typeInt8]
 		if r.scanp+size > len(r.in) {
@@ -112,9 +114,20 @@ func (r *Reader) Next() (Token, error) {
 
 	// signed LEB128 integer
 	if first == 0xBB {
+		r.lastIntKeyType = 0xBB
 		v, n := leb128.DecodeSleb128(r.in[r.scanp:])
 		r.scanp += int(n)
 		return Token{A: tokenInt, Data: int(v)}, nil
+	}
+
+	// float16
+	if first == 0xB8 {
+		if r.scanp+2 > len(r.in) {
+			return Token{}, io.EOF
+		}
+		bits := binary.LittleEndian.Uint16(r.in[r.scanp:])
+		r.scanp += 2
+		return Token{A: TokenFloat, Data: float16ToFloat64(bits)}, nil
 	}
 
 	// float64
@@ -422,9 +435,99 @@ func mergeTypedSlices(chunks []interface{}) interface{} {
 	return chunks[0]
 }
 
+// NextIntKey reads the next dict integer key given the type byte of the first key.
+// Dict keys after the first have no type prefix — the caller must supply the type.
+func (r *Reader) NextIntKey(typeByte byte) (Token, error) {
+	// skip padding
+	for r.scanp < len(r.in) && r.in[r.scanp] == tagPadding {
+		r.scanp++
+	}
+	if r.scanp >= len(r.in) {
+		return Token{}, io.EOF
+	}
+	// check for dictEnd
+	if r.in[r.scanp] == dictEnd {
+		r.scanp++
+		return Token{A: tokenDictEnd}, nil
+	}
+	// check for SLEB128 (0xBB) int key
+	if typeByte == 0xBB {
+		v, n := leb128.DecodeSleb128(r.in[r.scanp:])
+		r.scanp += int(n)
+		return Token{A: tokenInt, Data: int(v)}, nil
+	}
+	// typed LE integer
+	sizes := [8]int{1, 2, 4, 8, 1, 2, 4, 8} // B0..B7
+	if typeByte < typeInt8 || typeByte > typeUint64 {
+		return Token{}, fmt.Errorf("unexpected dict int key type: 0x%02X", typeByte)
+	}
+	size := sizes[typeByte-typeInt8]
+	if r.scanp+size > len(r.in) {
+		return Token{}, io.EOF
+	}
+	b := r.in[r.scanp : r.scanp+size]
+	r.scanp += size
+	signed := typeByte <= typeInt64
+	switch size {
+	case 1:
+		if signed {
+			return Token{A: tokenInt, Data: int(int8(b[0]))}, nil
+		}
+		return Token{A: tokenInt, Data: int(b[0])}, nil
+	case 2:
+		v := binary.LittleEndian.Uint16(b)
+		if signed {
+			return Token{A: tokenInt, Data: int(int16(v))}, nil
+		}
+		return Token{A: tokenInt, Data: int(v)}, nil
+	case 4:
+		v := binary.LittleEndian.Uint32(b)
+		if signed {
+			return Token{A: tokenInt, Data: int(int32(v))}, nil
+		}
+		return Token{A: tokenInt, Data: int(v)}, nil
+	case 8:
+		v := binary.LittleEndian.Uint64(b)
+		if signed {
+			return Token{A: tokenInt, Data: int64(v)}, nil
+		}
+		return Token{A: tokenInt, Data: uint64(v)}, nil
+	}
+	return Token{}, io.EOF
+}
+
 func (r *Reader) lruPrepend(s string) {
 	if len(r.lru) >= lruMaxSize {
 		r.lru = r.lru[:lruMaxSize-1]
 	}
 	r.lru = append([]string{s}, r.lru...)
+}
+
+// float16ToFloat64 converts an IEEE 754 half-precision (binary16) value to float64.
+func float16ToFloat64(bits uint16) float64 {
+	sign := uint64(bits>>15) << 63
+	exp := (bits >> 10) & 0x1F
+	mant := uint64(bits & 0x3FF)
+
+	var f64bits uint64
+	switch exp {
+	case 0: // subnormal
+		if mant == 0 {
+			f64bits = sign
+		} else {
+			// normalize
+			exp64 := uint64(1023 - 14)
+			for mant&0x400 == 0 {
+				mant <<= 1
+				exp64--
+			}
+			mant &^= 0x400
+			f64bits = sign | (exp64 << 52) | (mant << 42)
+		}
+	case 0x1F: // inf or nan
+		f64bits = sign | (0x7FF << 52) | (mant << 42)
+	default:
+		f64bits = sign | (uint64(exp+1023-15) << 52) | (mant << 42)
+	}
+	return math.Float64frombits(f64bits)
 }

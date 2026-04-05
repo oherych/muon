@@ -135,6 +135,9 @@ func (e *Encoder) write(w io.Writer, in interface{}) error {
 		return e.writeStruct(w, rv)
 	}
 	if kind == reflect.Pointer {
+		if rv.IsNil() {
+			return e.writeByte(w, nilValue)
+		}
 		return e.write(w, rv.Elem().Interface())
 	}
 

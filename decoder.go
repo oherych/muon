@@ -79,23 +79,30 @@ func (d *Decoder) readList() ([]interface{}, error) {
 	}
 }
 
-func (d *Decoder) readDict() (map[string]interface{}, error) {
-	out := make(map[string]interface{})
-	for {
-		// read key
-		keyTok, err := d.r.Next()
-		if err != nil {
-			return nil, err
-		}
-		if keyTok.A == tokenDictEnd {
-			return out, nil
-		}
-		if keyTok.A != TokenString {
-			return nil, io.ErrUnexpectedEOF
-		}
-		key := keyTok.Data.(string)
+func (d *Decoder) readDict() (interface{}, error) {
+	// peek at first key to decide string vs integer dict
+	keyTok, err := d.r.Next()
+	if err != nil {
+		return nil, err
+	}
+	if keyTok.A == tokenDictEnd {
+		return map[string]interface{}{}, nil
+	}
 
-		// read value
+	if keyTok.A == TokenString {
+		return d.readStringDict(keyTok)
+	}
+	if keyTok.A == tokenInt {
+		return d.readIntDict(keyTok)
+	}
+	return nil, io.ErrUnexpectedEOF
+}
+
+func (d *Decoder) readStringDict(firstKey Token) (map[string]interface{}, error) {
+	out := make(map[string]interface{})
+	keyTok := firstKey
+	for {
+		key := keyTok.Data.(string)
 		valTok, err := d.r.Next()
 		if err != nil {
 			return nil, err
@@ -105,5 +112,40 @@ func (d *Decoder) readDict() (map[string]interface{}, error) {
 			return nil, err
 		}
 		out[key] = val
+
+		keyTok, err = d.r.Next()
+		if err != nil {
+			return nil, err
+		}
+		if keyTok.A == tokenDictEnd {
+			return out, nil
+		}
+	}
+}
+
+func (d *Decoder) readIntDict(firstKey Token) (map[interface{}]interface{}, error) {
+	out := make(map[interface{}]interface{})
+	intKeyType := d.r.lastIntKeyType
+	keyTok := firstKey
+	for {
+		key := keyTok.Data
+		valTok, err := d.r.Next()
+		if err != nil {
+			return nil, err
+		}
+		val, err := d.tokenToValue(valTok)
+		if err != nil {
+			return nil, err
+		}
+		out[key] = val
+
+		// subsequent keys have no type prefix — use the stored type byte
+		keyTok, err = d.r.NextIntKey(intKeyType)
+		if err != nil {
+			return nil, err
+		}
+		if keyTok.A == tokenDictEnd {
+			return out, nil
+		}
 	}
 }
