@@ -159,7 +159,7 @@ func (e *Encoder) write(w io.Writer, in interface{}) error {
 	if kind == reflect.Struct {
 		return e.writeStruct(w, rv)
 	}
-	if kind == reflect.Pointer {
+	if kind == reflect.Ptr {
 		if rv.IsNil() {
 			return e.writeByte(w, nilValue)
 		}
