@@ -25,7 +25,7 @@ type Reader struct {
 // tokens that carry no payload, such as list/dict delimiters).
 type Token struct {
 	A    TokenEnum
-	Data interface{}
+	Data any
 }
 
 // NewByteReader creates a Reader that decodes from the given byte slice.
@@ -82,7 +82,7 @@ func (r *Reader) Next() (Token, error) {
 
 	// inline integers 0–9
 	if first >= 0xA0 && first <= 0xA0+9 {
-		return Token{A: tokenInt, Data: int(first - 0xA0)}, nil
+		return Token{A: TokenInt, Data: int(first - 0xA0)}, nil
 	}
 
 	// typed LE integers: 0xB0..0xB7
@@ -99,27 +99,27 @@ func (r *Reader) Next() (Token, error) {
 		switch size {
 		case 1:
 			if signed {
-				return Token{A: tokenInt, Data: int(int8(b[0]))}, nil
+				return Token{A: TokenInt, Data: int(int8(b[0]))}, nil
 			}
-			return Token{A: tokenInt, Data: int(b[0])}, nil
+			return Token{A: TokenInt, Data: int(b[0])}, nil
 		case 2:
 			v := binary.LittleEndian.Uint16(b)
 			if signed {
-				return Token{A: tokenInt, Data: int(int16(v))}, nil
+				return Token{A: TokenInt, Data: int(int16(v))}, nil
 			}
-			return Token{A: tokenInt, Data: int(v)}, nil
+			return Token{A: TokenInt, Data: int(v)}, nil
 		case 4:
 			v := binary.LittleEndian.Uint32(b)
 			if signed {
-				return Token{A: tokenInt, Data: int(int32(v))}, nil
+				return Token{A: TokenInt, Data: int(int32(v))}, nil
 			}
-			return Token{A: tokenInt, Data: int(v)}, nil
+			return Token{A: TokenInt, Data: int(v)}, nil
 		case 8:
 			v := binary.LittleEndian.Uint64(b)
 			if signed {
-				return Token{A: tokenInt, Data: int64(v)}, nil
+				return Token{A: TokenInt, Data: int64(v)}, nil
 			}
-			return Token{A: tokenInt, Data: uint64(v)}, nil
+			return Token{A: TokenInt, Data: uint64(v)}, nil
 		}
 	}
 
@@ -128,7 +128,7 @@ func (r *Reader) Next() (Token, error) {
 		r.lastIntKeyType = 0xBB
 		v, n := leb128.DecodeSleb128(r.in[r.scanp:])
 		r.scanp += int(n)
-		return Token{A: tokenInt, Data: int(v)}, nil
+		return Token{A: TokenInt, Data: int(v)}, nil
 	}
 
 	// float16
@@ -245,7 +245,7 @@ func (r *Reader) Next() (Token, error) {
 	return Token{}, io.EOF
 }
 
-func (r *Reader) readTypedElems(typeByte byte, count int) (interface{}, error) {
+func (r *Reader) readTypedElems(typeByte byte, count int) (any, error) {
 	read := func(n int) ([]byte, error) {
 		end := r.scanp + n*count
 		if end > len(r.in) {
@@ -359,9 +359,9 @@ func (r *Reader) readTypedElems(typeByte byte, count int) (interface{}, error) {
 	return nil, fmt.Errorf("unknown typed array type byte: 0x%02X", typeByte)
 }
 
-func (r *Reader) readChunkedTypedElems(typeByte byte) (interface{}, error) {
+func (r *Reader) readChunkedTypedElems(typeByte byte) (any, error) {
 	// read chunks until zero-length terminator, aggregate into one slice
-	var allElems []interface{}
+	var allElems []any
 	for {
 		count, n := leb128.DecodeUleb128(r.in[r.scanp:])
 		r.scanp += int(n)
@@ -380,7 +380,7 @@ func (r *Reader) readChunkedTypedElems(typeByte byte) (interface{}, error) {
 	return mergeTypedSlices(allElems), nil
 }
 
-func mergeTypedSlices(chunks []interface{}) interface{} {
+func mergeTypedSlices(chunks []any) any {
 	switch chunks[0].(type) {
 	case []int8:
 		var out []int8
@@ -449,7 +449,7 @@ func mergeTypedSlices(chunks []interface{}) interface{} {
 // NextIntKey reads the next integer key in a dict whose first key had the given
 // typeByte (0xB0–0xB7 or 0xBB). Per the muon spec, only the first key in an
 // integer-keyed dict carries a type prefix; all subsequent keys are raw bytes
-// of the same size. Returns tokenDictEnd if the closing 0x93 byte is next.
+// of the same size. Returns TokenDictEnd if the closing 0x93 byte is next.
 func (r *Reader) NextIntKey(typeByte byte) (Token, error) {
 	// skip padding
 	for r.scanp < len(r.in) && r.in[r.scanp] == tagPadding {
@@ -461,13 +461,13 @@ func (r *Reader) NextIntKey(typeByte byte) (Token, error) {
 	// check for dictEnd
 	if r.in[r.scanp] == dictEnd {
 		r.scanp++
-		return Token{A: tokenDictEnd}, nil
+		return Token{A: TokenDictEnd}, nil
 	}
 	// check for SLEB128 (0xBB) int key
 	if typeByte == 0xBB {
 		v, n := leb128.DecodeSleb128(r.in[r.scanp:])
 		r.scanp += int(n)
-		return Token{A: tokenInt, Data: int(v)}, nil
+		return Token{A: TokenInt, Data: int(v)}, nil
 	}
 	// typed LE integer
 	sizes := [8]int{1, 2, 4, 8, 1, 2, 4, 8} // B0..B7
@@ -484,27 +484,27 @@ func (r *Reader) NextIntKey(typeByte byte) (Token, error) {
 	switch size {
 	case 1:
 		if signed {
-			return Token{A: tokenInt, Data: int(int8(b[0]))}, nil
+			return Token{A: TokenInt, Data: int(int8(b[0]))}, nil
 		}
-		return Token{A: tokenInt, Data: int(b[0])}, nil
+		return Token{A: TokenInt, Data: int(b[0])}, nil
 	case 2:
 		v := binary.LittleEndian.Uint16(b)
 		if signed {
-			return Token{A: tokenInt, Data: int(int16(v))}, nil
+			return Token{A: TokenInt, Data: int(int16(v))}, nil
 		}
-		return Token{A: tokenInt, Data: int(v)}, nil
+		return Token{A: TokenInt, Data: int(v)}, nil
 	case 4:
 		v := binary.LittleEndian.Uint32(b)
 		if signed {
-			return Token{A: tokenInt, Data: int(int32(v))}, nil
+			return Token{A: TokenInt, Data: int(int32(v))}, nil
 		}
-		return Token{A: tokenInt, Data: int(v)}, nil
+		return Token{A: TokenInt, Data: int(v)}, nil
 	case 8:
 		v := binary.LittleEndian.Uint64(b)
 		if signed {
-			return Token{A: tokenInt, Data: int64(v)}, nil
+			return Token{A: TokenInt, Data: int64(v)}, nil
 		}
-		return Token{A: tokenInt, Data: uint64(v)}, nil
+		return Token{A: TokenInt, Data: uint64(v)}, nil
 	}
 	return Token{}, io.EOF
 }

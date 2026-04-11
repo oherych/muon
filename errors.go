@@ -12,7 +12,11 @@ const (
 	ErrCodeUnexpectedToken
 )
 
-// MuonError is a structured error returned by encoding and decoding operations.
+// MuonError is a structured error returned by Unmarshal and other typed decode
+// paths when the target is invalid, a token cannot be assigned to the target
+// type, or an unexpected token is encountered.
+//
+// Other APIs may still return standard errors such as io.EOF or fmt errors.
 type MuonError struct {
 	Code int
 	Msg  string
@@ -26,7 +30,7 @@ func errInvalidTarget(msg string) error {
 	return MuonError{Code: ErrCodeInvalidTarget, Msg: msg}
 }
 
-func errTypeMismatch(token TokenEnum, target interface{}) error {
+func errTypeMismatch(token TokenEnum, target any) error {
 	return MuonError{Code: ErrCodeTypeMismatch, Msg: fmt.Sprintf("cannot assign %s token to %T", token, target)}
 }
 

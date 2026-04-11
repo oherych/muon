@@ -16,7 +16,7 @@ func NewDecoder(data []byte) *Decoder {
 
 // Decode reads the next value from the stream and returns it as a Go value.
 // Returns io.EOF when the stream is exhausted.
-func (d *Decoder) Decode() (interface{}, error) {
+func (d *Decoder) Decode() (any, error) {
 	tok, err := d.r.Next()
 	if err != nil {
 		return nil, err
@@ -24,7 +24,7 @@ func (d *Decoder) Decode() (interface{}, error) {
 	return d.tokenToValue(tok)
 }
 
-func (d *Decoder) tokenToValue(tok Token) (interface{}, error) {
+func (d *Decoder) tokenToValue(tok Token) (any, error) {
 	switch tok.A {
 	case TokenMagic, TokenCount:
 		// skip transparent tokens and read the actual value
@@ -33,28 +33,28 @@ func (d *Decoder) tokenToValue(tok Token) (interface{}, error) {
 	case TokenString:
 		return tok.Data.(string), nil
 
-	case tokenInt:
+	case TokenInt:
 		return tok.Data, nil
 
 	case TokenFloat:
 		return tok.Data.(float64), nil
 
-	case tokenTrue:
+	case TokenTrue:
 		return true, nil
 
-	case tokenFalse:
+	case TokenFalse:
 		return false, nil
 
-	case tokenNil:
+	case TokenNil:
 		return nil, nil
 
 	case TokenTypedArray:
 		return tok.Data, nil
 
-	case tokenListStart:
+	case TokenListStart:
 		return d.readList()
 
-	case tokenDictStart:
+	case TokenDictStart:
 		return d.readDict()
 
 	default:
@@ -62,14 +62,14 @@ func (d *Decoder) tokenToValue(tok Token) (interface{}, error) {
 	}
 }
 
-func (d *Decoder) readList() ([]interface{}, error) {
-	var out []interface{}
+func (d *Decoder) readList() ([]any, error) {
+	var out []any
 	for {
 		tok, err := d.r.Next()
 		if err != nil {
 			return nil, err
 		}
-		if tok.A == tokenListEnd {
+		if tok.A == TokenListEnd {
 			return out, nil
 		}
 		v, err := d.tokenToValue(tok)
@@ -80,27 +80,27 @@ func (d *Decoder) readList() ([]interface{}, error) {
 	}
 }
 
-func (d *Decoder) readDict() (interface{}, error) {
+func (d *Decoder) readDict() (any, error) {
 	// peek at first key to decide string vs integer dict
 	keyTok, err := d.r.Next()
 	if err != nil {
 		return nil, err
 	}
-	if keyTok.A == tokenDictEnd {
-		return map[string]interface{}{}, nil
+	if keyTok.A == TokenDictEnd {
+		return map[string]any{}, nil
 	}
 
 	if keyTok.A == TokenString {
 		return d.readStringDict(keyTok)
 	}
-	if keyTok.A == tokenInt {
+	if keyTok.A == TokenInt {
 		return d.readIntDict(keyTok)
 	}
 	return nil, io.ErrUnexpectedEOF
 }
 
-func (d *Decoder) readStringDict(firstKey Token) (map[string]interface{}, error) {
-	out := make(map[string]interface{})
+func (d *Decoder) readStringDict(firstKey Token) (map[string]any, error) {
+	out := make(map[string]any)
 	keyTok := firstKey
 	for {
 		key := keyTok.Data.(string)
@@ -118,14 +118,14 @@ func (d *Decoder) readStringDict(firstKey Token) (map[string]interface{}, error)
 		if err != nil {
 			return nil, err
 		}
-		if keyTok.A == tokenDictEnd {
+		if keyTok.A == TokenDictEnd {
 			return out, nil
 		}
 	}
 }
 
-func (d *Decoder) readIntDict(firstKey Token) (map[interface{}]interface{}, error) {
-	out := make(map[interface{}]interface{})
+func (d *Decoder) readIntDict(firstKey Token) (map[any]any, error) {
+	out := make(map[any]any)
 	intKeyType := d.r.lastIntKeyType
 	keyTok := firstKey
 	for {
@@ -145,7 +145,7 @@ func (d *Decoder) readIntDict(firstKey Token) (map[interface{}]interface{}, erro
 		if err != nil {
 			return nil, err
 		}
-		if keyTok.A == tokenDictEnd {
+		if keyTok.A == TokenDictEnd {
 			return out, nil
 		}
 	}

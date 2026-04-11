@@ -54,7 +54,7 @@ func fuzzRoundTrip[T any](t *testing.T, in T) {
 	}
 }
 
-func marshalBytes(v interface{}) ([]byte, error) {
+func marshalBytes(v any) ([]byte, error) {
 	var buf bytes.Buffer
 	var enc Encoder
 	err := enc.Write(&buf, v)

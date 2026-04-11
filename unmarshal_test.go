@@ -55,7 +55,7 @@ func TestUnmarshal_Primitives(t *testing.T) {
 		assert.Equal(t, "hello", v)
 	})
 	t.Run("nil_into_interface", func(t *testing.T) {
-		var v interface{}
+		var v any
 		require.NoError(t, Unmarshal(encode(t, nil), &v))
 		assert.Nil(t, v)
 	})
@@ -94,6 +94,18 @@ func TestUnmarshal_Struct_DefaultFieldName(t *testing.T) {
 	assert.Equal(t, "world", out.Hello)
 }
 
+func TestUnmarshal_Struct_DefaultFieldNameAcronym(t *testing.T) {
+	type S struct {
+		URL        string
+		HTTPStatus int
+	}
+	data := encode(t, S{URL: "https://example.com", HTTPStatus: 200})
+	var out S
+	require.NoError(t, Unmarshal(data, &out))
+	assert.Equal(t, "https://example.com", out.URL)
+	assert.Equal(t, 200, out.HTTPStatus)
+}
+
 func TestUnmarshal_Struct_UnknownFieldSkipped(t *testing.T) {
 	// encode struct with extra field, decode into smaller struct
 	type Full struct {
@@ -119,7 +131,7 @@ func TestUnmarshal_Map(t *testing.T) {
 }
 
 func TestUnmarshal_Slice(t *testing.T) {
-	data := encode(t, []interface{}{"x", "y", "z"})
+	data := encode(t, []any{"x", "y", "z"})
 	var out []string
 	require.NoError(t, Unmarshal(data, &out))
 	assert.Equal(t, []string{"x", "y", "z"}, out)
@@ -148,10 +160,10 @@ func TestUnmarshal_Pointer(t *testing.T) {
 }
 
 func TestUnmarshal_Interface(t *testing.T) {
-	data := encode(t, []interface{}{"a", 1, true})
-	var out interface{}
+	data := encode(t, []any{"a", 1, true})
+	var out any
 	require.NoError(t, Unmarshal(data, &out))
-	assert.Equal(t, []interface{}{"a", 1, true}, out)
+	assert.Equal(t, []any{"a", 1, true}, out)
 }
 
 func TestUnmarshal_MagicTransparent(t *testing.T) {
@@ -184,4 +196,81 @@ func TestUnmarshal_TypeMismatch(t *testing.T) {
 	me, ok := err.(MuonError)
 	require.True(t, ok)
 	assert.Equal(t, ErrCodeTypeMismatch, me.Code)
+}
+
+func TestUnmarshal_MapIntKeys(t *testing.T) {
+	enc := &Encoder{Deterministic: true}
+	data := encodeWith(t, enc, map[int64]string{1: "a", 2: "b"})
+	var out map[int64]string
+	require.NoError(t, Unmarshal(data, &out))
+	assert.Equal(t, map[int64]string{1: "a", 2: "b"}, out)
+}
+
+func TestUnmarshal_SkipNestedValue(t *testing.T) {
+	// Struct with extra fields whose values are nested list and nested dict.
+	// skipValue must correctly consume the entire nested structure.
+	type Full struct {
+		Name string   `muon:"name"`
+		Tags []string `muon:"tags"`
+		Meta struct {
+			K string `muon:"k"`
+		} `muon:"meta"`
+	}
+	type Partial struct {
+		Name string `muon:"name"`
+	}
+	enc := &Encoder{Deterministic: true}
+	data := encodeWith(t, enc, Full{
+		Name: "test",
+		Tags: []string{"a", "b"},
+		Meta: struct {
+			K string `muon:"k"`
+		}{K: "v"},
+	})
+	var out Partial
+	require.NoError(t, Unmarshal(data, &out))
+	assert.Equal(t, "test", out.Name)
+}
+
+func TestUnmarshal_EmptySlice(t *testing.T) {
+	var out []string
+	require.NoError(t, Unmarshal(encode(t, []any{}), &out))
+	assert.Empty(t, out)
+}
+
+func TestUnmarshal_NonPointerTarget(t *testing.T) {
+	var v int
+	err := Unmarshal(encode(t, 1), v) // passing non-pointer
+	require.Error(t, err)
+	me, ok := err.(MuonError)
+	require.True(t, ok)
+	assert.Equal(t, ErrCodeInvalidTarget, me.Code)
+}
+
+func TestUnmarshal_DecoderUnmarshal(t *testing.T) {
+	// Decoder.Unmarshal used directly (vs package-level Unmarshal shortcut).
+	data := encode(t, "direct")
+	d := NewDecoder(data)
+	var out string
+	require.NoError(t, d.Unmarshal(&out))
+	assert.Equal(t, "direct", out)
+}
+
+func TestUnmarshal_RoundTrip(t *testing.T) {
+	type Item struct {
+		ID     int64   `muon:"id"`
+		Name   string  `muon:"name"`
+		Score  float64 `muon:"score"`
+		Active bool    `muon:"active"`
+	}
+	in := Item{ID: 42, Name: "hello", Score: 3.14, Active: true}
+	enc := &Encoder{Deterministic: true}
+	data := encodeWith(t, enc, in)
+
+	var out Item
+	require.NoError(t, Unmarshal(data, &out))
+	assert.Equal(t, in.ID, out.ID)
+	assert.Equal(t, in.Name, out.Name)
+	assert.InDelta(t, in.Score, out.Score, 1e-10)
+	assert.Equal(t, in.Active, out.Active)
 }

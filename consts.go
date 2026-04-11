@@ -27,7 +27,7 @@ const (
 	stringRef       = 0x81
 	typedArray      = 0x84
 	typedArrayChunk = 0x85
-	floatF64   = 0xBA
+	floatF64        = 0xBA
 
 	// magic signature bytes (after the 0x8F tag byte)
 	tagMagicByte = 0x8F
@@ -43,4 +43,19 @@ const (
 	typeUint64  = 0xB7
 	typeFloat32 = 0xB9
 	typeFloat64 = 0xBA // same as floatF64
+)
+
+// TypeByte* constants identify the numeric element type within a TypedArray.
+// Pass one of these to [Encoder.WriteChunkedTypedArray] to specify the wire type.
+const (
+	TypeByteInt8    byte = typeInt8
+	TypeByteInt16   byte = typeInt16
+	TypeByteInt32   byte = typeInt32
+	TypeByteInt64   byte = typeInt64
+	TypeByteUint8   byte = typeUint8
+	TypeByteUint16  byte = typeUint16
+	TypeByteUint32  byte = typeUint32
+	TypeByteUint64  byte = typeUint64
+	TypeByteFloat32 byte = typeFloat32
+	TypeByteFloat64 byte = typeFloat64
 )

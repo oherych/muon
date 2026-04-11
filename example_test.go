@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"oherych/muon"
+	"github.com/oherych/muon"
 )
 
 // Encode a struct and decode it back with Decoder.
@@ -21,7 +21,7 @@ func Example() {
 
 	d := muon.NewDecoder(buf.Bytes())
 	v, _ := d.Decode()
-	m := v.(map[string]interface{})
+	m := v.(map[string]any)
 	fmt.Printf("x=%.1f y=%.1f\n", m["x"], m["y"])
 	// Output:
 	// x=1.5 y=2.5
@@ -123,7 +123,7 @@ func ExampleEncoder_Deterministic() {
 func ExampleReader_Next() {
 	var buf bytes.Buffer
 	enc := muon.Encoder{}
-	enc.Write(&buf, []interface{}{"a", "b"})
+	enc.Write(&buf, []any{"a", "b"})
 
 	r := muon.NewByteReader(buf.Bytes())
 	for {

@@ -19,24 +19,32 @@ const (
 	// Returned by [Reader.Next]; transparently skipped by [Decoder.Decode].
 	TokenCount TokenEnum = "count"
 
-	tokenNil       TokenEnum = "nil"
-	tokenFalse     TokenEnum = "false"
-	tokenTrue      TokenEnum = "true"
-	tokenListStart TokenEnum = "list_start"
-	tokenListEnd   TokenEnum = "list_end"
-	tokenDictStart TokenEnum = "dict_start"
-	tokenDictEnd   TokenEnum = "dict_end"
-	tokenInt       TokenEnum = "int"
+	// TokenNil is a null/nil value.
+	TokenNil TokenEnum = "nil"
+	// TokenFalse is a boolean false value.
+	TokenFalse TokenEnum = "false"
+	// TokenTrue is a boolean true value.
+	TokenTrue TokenEnum = "true"
+	// TokenListStart marks the beginning of a list.
+	TokenListStart TokenEnum = "list_start"
+	// TokenListEnd marks the end of a list.
+	TokenListEnd TokenEnum = "list_end"
+	// TokenDictStart marks the beginning of a dict (map or struct).
+	TokenDictStart TokenEnum = "dict_start"
+	// TokenDictEnd marks the end of a dict.
+	TokenDictEnd TokenEnum = "dict_end"
+	// TokenInt is an integer value. Token.Data holds int, int64, or uint64.
+	TokenInt TokenEnum = "int"
 )
 
 var (
 	tokenMapping = map[byte]TokenEnum{
-		listStart: tokenListStart,
-		listEnd:   tokenListEnd,
-		dictStart: tokenDictStart,
-		dictEnd:   tokenDictEnd,
-		boolFalse: tokenFalse,
-		boolTrue:  tokenTrue,
-		nilValue:  tokenNil,
+		listStart: TokenListStart,
+		listEnd:   TokenListEnd,
+		dictStart: TokenDictStart,
+		dictEnd:   TokenDictEnd,
+		boolFalse: TokenFalse,
+		boolTrue:  TokenTrue,
+		nilValue:  TokenNil,
 	}
 )

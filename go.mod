@@ -1,4 +1,4 @@
-module oherych/muon
+module github.com/oherych/muon
 
 go 1.18
 

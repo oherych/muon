@@ -11,13 +11,13 @@
 //
 //	var buf bytes.Buffer
 //	enc := muon.Encoder{}
-//	enc.Write(&buf, map[string]interface{}{
+//	enc.Write(&buf, map[string]any{
 //	    "name": "Alice",
 //	    "age":  30,
 //	})
 //
-// Structs are encoded as dicts. Field names default to the lowercase field
-// name; use the `muon` struct tag to override:
+// Structs are encoded as dicts. Field names default to strings.ToLower of the
+// Go field name; use the `muon` struct tag to override or skip a field:
 //
 //	type User struct {
 //	    Name string `muon:"name"`
@@ -26,7 +26,13 @@
 //
 // # Decoding
 //
-// [NewDecoder] provides a high-level API that reconstructs Go values:
+// [Unmarshal] decodes into a typed Go value:
+//
+//	var u User
+//	err := muon.Unmarshal(data, &u)
+//
+// [NewDecoder] provides a streaming API that handles multiple concatenated
+// objects (chaining):
 //
 //	d := muon.NewDecoder(data)
 //	for {
@@ -37,10 +43,7 @@
 //	    fmt.Println(v)
 //	}
 //
-// For lower-level control, use [NewByteReader] and call [Reader.Next] to
-// iterate over tokens one at a time.
-//
-// # Type mapping (Decoder)
+// # Type mapping (Decoder / Unmarshal)
 //
 //	muon type       → Go value
 //	─────────────────────────────────────────────────────
@@ -50,14 +53,24 @@
 //	true / false    → bool
 //	null            → nil
 //	TypedArray      → []int8, []float64, etc.
-//	list            → []interface{}
-//	dict (str keys) → map[string]interface{}
-//	dict (int keys) → map[interface{}]interface{}
+//	list            → []any
+//	dict (str keys) → map[string]any
+//	dict (int keys) → map[any]any
 //
-// # Deterministic encoding
+// # Options
+//
+// Set [Encoder.LRU] to enable string back-references, reducing the encoded
+// size of documents with repeated strings. Reuse the same [Encoder] across
+// multiple [Encoder.Write] calls to share the deduplication table.
 //
 // Set [Encoder.Deterministic] to produce canonical output — same input always
 // yields identical bytes. This sorts dict keys and disables LRU string refs.
+//
+// # Errors
+//
+// [Unmarshal] and [Decoder.Unmarshal] may return [MuonError] with a Code field:
+// [ErrCodeInvalidTarget], [ErrCodeTypeMismatch], or [ErrCodeUnexpectedToken].
+// Streaming APIs may also return standard errors such as io.EOF.
 //
 // # Specification
 //

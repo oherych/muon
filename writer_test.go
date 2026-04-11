@@ -15,14 +15,14 @@ var (
 	testString = "test"
 
 	tests = map[string]struct {
-		golang  interface{}
+		golang  any
 		encoded []byte
 		tokens  []Token
 	}{
 		"nil": {
 			golang:  nil,
 			encoded: []byte{nilValue},
-			tokens:  []Token{{A: tokenNil}},
+			tokens:  []Token{{A: TokenNil}},
 		},
 		"string_empty": {
 			golang:  "",
@@ -59,38 +59,38 @@ var (
 		"true": {
 			golang:  true,
 			encoded: []byte{boolTrue},
-			tokens:  []Token{{A: tokenTrue}},
+			tokens:  []Token{{A: TokenTrue}},
 		},
 		"false": {
 			golang:  false,
 			encoded: []byte{boolFalse},
-			tokens:  []Token{{A: tokenFalse}},
+			tokens:  []Token{{A: TokenFalse}},
 		},
 
 		"int": {
 			golang:  5,
 			encoded: []byte{0xa5},
-			tokens:  []Token{{A: tokenInt, Data: 5}},
+			tokens:  []Token{{A: TokenInt, Data: 5}},
 		},
-		"int8":  {golang: int8(8), encoded: []byte{0xa8}, tokens: []Token{{A: tokenInt, Data: 8}}},
-		"int16": {golang: int16(16), encoded: []byte{0xbb, 0x10}, tokens: []Token{{A: tokenInt, Data: 16}}},
-		"int32": {golang: int32(32), encoded: []byte{0xbb, 0x20}, tokens: []Token{{A: tokenInt, Data: 32}}},
-		"int64": {golang: int64(64), encoded: []byte{0xbb, 0xc0, 0x0}, tokens: []Token{{A: tokenInt, Data: 64}}},
+		"int8":  {golang: int8(8), encoded: []byte{0xa8}, tokens: []Token{{A: TokenInt, Data: 8}}},
+		"int16": {golang: int16(16), encoded: []byte{0xbb, 0x10}, tokens: []Token{{A: TokenInt, Data: 16}}},
+		"int32": {golang: int32(32), encoded: []byte{0xbb, 0x20}, tokens: []Token{{A: TokenInt, Data: 32}}},
+		"int64": {golang: int64(64), encoded: []byte{0xbb, 0xc0, 0x0}, tokens: []Token{{A: TokenInt, Data: 64}}},
 
 		"uint": {
 			golang:  uint(5),
 			encoded: []byte{0xa5},
-			tokens:  []Token{{A: tokenInt, Data: 5}},
+			tokens:  []Token{{A: TokenInt, Data: 5}},
 		},
-		"uint8":  {golang: uint8(8), encoded: []byte{0xa8}, tokens: []Token{{A: tokenInt, Data: 8}}},
-		"uint16": {golang: uint16(16), encoded: []byte{0xbb, 0x10}, tokens: []Token{{A: tokenInt, Data: 16}}},
-		"uint32": {golang: uint32(32), encoded: []byte{0xbb, 0x20}, tokens: []Token{{A: tokenInt, Data: 32}}},
-		"uint64": {golang: uint64(64), encoded: []byte{0xbb, 0xc0, 0x00}, tokens: []Token{{A: tokenInt, Data: 64}}},
+		"uint8":  {golang: uint8(8), encoded: []byte{0xa8}, tokens: []Token{{A: TokenInt, Data: 8}}},
+		"uint16": {golang: uint16(16), encoded: []byte{0xbb, 0x10}, tokens: []Token{{A: TokenInt, Data: 16}}},
+		"uint32": {golang: uint32(32), encoded: []byte{0xbb, 0x20}, tokens: []Token{{A: TokenInt, Data: 32}}},
+		"uint64": {golang: uint64(64), encoded: []byte{0xbb, 0xc0, 0x00}, tokens: []Token{{A: TokenInt, Data: 64}}},
 
 		"slice": {
-			golang:  []interface{}{testString, true},
+			golang:  []any{testString, true},
 			encoded: []byte{listStart, 0x74, 0x65, 0x73, 0x74, stringEnd, boolTrue, listEnd},
-			tokens:  []Token{{A: tokenListStart}, {A: TokenString, Data: testString}, {A: tokenTrue}, {A: tokenListEnd}},
+			tokens:  []Token{{A: TokenListStart}, {A: TokenString, Data: testString}, {A: TokenTrue}, {A: TokenListEnd}},
 		},
 		//"typed_array": {
 		//	golang: []int{10, 500},
@@ -115,18 +115,18 @@ var (
 		"array": {
 			golang:  [2]bool{false, true},
 			encoded: []byte{listStart, boolFalse, boolTrue, listEnd},
-			tokens:  []Token{{A: tokenListStart}, {A: tokenFalse}, {A: tokenTrue}, {A: tokenListEnd}},
+			tokens:  []Token{{A: TokenListStart}, {A: TokenFalse}, {A: TokenTrue}, {A: TokenListEnd}},
 		},
 
 		"map_string": {
 			golang:  map[string]string{"a": "b"},
 			encoded: []byte{dictStart, 'a', stringEnd, 'b', stringEnd, dictEnd},
-			tokens:  []Token{{A: tokenDictStart}, {A: TokenString, Data: "a"}, {A: TokenString, Data: "b"}, {A: tokenDictEnd}},
+			tokens:  []Token{{A: TokenDictStart}, {A: TokenString, Data: "a"}, {A: TokenString, Data: "b"}, {A: TokenDictEnd}},
 		},
 		"map_int64_key": {
 			golang:  map[int64]string{10: "z"},
 			encoded: []byte{dictStart, typeInt64, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 'z', stringEnd, dictEnd},
-			tokens:  []Token{{A: tokenDictStart}, {A: tokenInt, Data: int64(10)}, {A: TokenString, Data: "z"}, {A: tokenDictEnd}},
+			tokens:  []Token{{A: TokenDictStart}, {A: TokenInt, Data: int64(10)}, {A: TokenString, Data: "z"}, {A: TokenDictEnd}},
 		},
 
 		"float64_pi": {
@@ -178,14 +178,14 @@ var (
 				dictEnd,
 			},
 			tokens: []Token{
-				{A: tokenDictStart},
+				{A: TokenDictStart},
 				{A: TokenString, Data: "name"},
 				{A: TokenString, Data: "alice"},
 				{A: TokenString, Data: "age"},
-				{A: tokenInt, Data: 3},
+				{A: TokenInt, Data: 3},
 				{A: TokenString, Data: "notag"},
-				{A: tokenTrue},
-				{A: tokenDictEnd},
+				{A: TokenTrue},
+				{A: TokenDictEnd},
 			},
 		},
 	}
@@ -226,7 +226,7 @@ func TestLRUStringRefs(t *testing.T) {
 	enc := Encoder{LRU: true}
 
 	// write two values referencing the same strings
-	err := enc.Write(&buf, []interface{}{"foo", "bar", "foo"})
+	err := enc.Write(&buf, []any{"foo", "bar", "foo"})
 	assert.Nil(t, err)
 
 	// first "foo": 0x8C tag + "foo\x00"
@@ -252,11 +252,11 @@ func TestLRUStringRefs(t *testing.T) {
 		tokens = append(tokens, tok)
 	}
 	assert.Equal(t, []Token{
-		{A: tokenListStart},
+		{A: TokenListStart},
 		{A: TokenString, Data: "foo"},
 		{A: TokenString, Data: "bar"},
 		{A: TokenString, Data: "foo"},
-		{A: tokenListEnd},
+		{A: TokenListEnd},
 	}, tokens)
 }
 
@@ -292,7 +292,7 @@ func TestReaderMagicAndPadding(t *testing.T) {
 
 	tok, err = r.Next()
 	assert.Nil(t, err)
-	assert.Equal(t, tokenTrue, tok.A)
+	assert.Equal(t, TokenTrue, tok.A)
 }
 
 func TestReaderCountTag(t *testing.T) {
@@ -307,7 +307,7 @@ func TestReaderCountTag(t *testing.T) {
 
 	tok, err = r.Next()
 	assert.Nil(t, err)
-	assert.Equal(t, tokenListStart, tok.A)
+	assert.Equal(t, TokenListStart, tok.A)
 }
 
 func TestDeterministicMapOrdering(t *testing.T) {
@@ -321,11 +321,11 @@ func TestDeterministicMapOrdering(t *testing.T) {
 	r := NewByteReader(buf.Bytes())
 	var keys []string
 	tok, _ := r.Next() // dictStart
-	assert.Equal(t, tokenDictStart, tok.A)
+	assert.Equal(t, TokenDictStart, tok.A)
 	for {
 		tok, err := r.Next()
 		assert.Nil(t, err)
-		if tok.A == tokenDictEnd {
+		if tok.A == TokenDictEnd {
 			break
 		}
 		assert.Equal(t, TokenString, tok.A)
@@ -405,22 +405,22 @@ func TestDecoder(t *testing.T) {
 	t.Run("list", func(t *testing.T) {
 		var buf bytes.Buffer
 		var enc Encoder
-		// use []interface{} to avoid TypedArray path
-		enc.Write(&buf, []interface{}{"a", "b"})
+		// use []any to avoid TypedArray path
+		enc.Write(&buf, []any{"a", "b"})
 		d := NewDecoder(buf.Bytes())
 		v, err := d.Decode()
 		assert.Nil(t, err)
-		assert.Equal(t, []interface{}{"a", "b"}, v)
+		assert.Equal(t, []any{"a", "b"}, v)
 	})
 
 	t.Run("dict", func(t *testing.T) {
 		var buf bytes.Buffer
 		enc := Encoder{Deterministic: true}
-		enc.Write(&buf, map[string]interface{}{"x": 1})
+		enc.Write(&buf, map[string]any{"x": 1})
 		d := NewDecoder(buf.Bytes())
 		v, err := d.Decode()
 		assert.Nil(t, err)
-		assert.Equal(t, map[string]interface{}{"x": 1}, v)
+		assert.Equal(t, map[string]any{"x": 1}, v)
 	})
 
 	t.Run("chaining", func(t *testing.T) {

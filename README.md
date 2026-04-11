@@ -5,7 +5,7 @@ Go implementation of the [µON (muon)](https://github.com/vshymanskyy/muon) bina
 ## Installation
 
 ```bash
-go get oherych/muon
+go get github.com/oherych/muon
 ```
 
 ## Quick start
@@ -15,13 +15,14 @@ go get oherych/muon
 ```go
 var buf bytes.Buffer
 enc := muon.Encoder{}
-enc.Write(&buf, map[string]interface{}{
+enc.Write(&buf, map[string]any{
     "name": "Alice",
     "age":  30,
 })
 ```
 
-Structs are encoded as dicts. Use the `muon` tag to control field names:
+Structs are encoded as dicts. By default a field name is written as
+`strings.ToLower(field.Name)`. Use the `muon` tag to control field names:
 
 ```go
 type User struct {
@@ -30,7 +31,20 @@ type User struct {
 }
 ```
 
-### Decoding
+### Decoding — high level
+
+`Unmarshal` decodes into a typed Go value:
+
+```go
+type User struct {
+    Name string `muon:"name"`
+    Age  int    `muon:"age"`
+}
+var u User
+err := muon.Unmarshal(data, &u)
+```
+
+`Decoder` handles multiple concatenated objects (chaining):
 
 ```go
 d := muon.NewDecoder(data)
@@ -51,9 +65,9 @@ for {
 | true / false | `bool` |
 | null | `nil` |
 | TypedArray | `[]int8`, `[]float64`, etc. |
-| list | `[]interface{}` |
-| dict (string keys) | `map[string]interface{}` |
-| dict (integer keys) | `map[interface{}]interface{}` |
+| list | `[]any` |
+| dict (string keys) | `map[string]any` |
+| dict (integer keys) | `map[any]any` |
 
 ### Low-level token reader
 
@@ -67,6 +81,10 @@ for {
     fmt.Println(tok.A, tok.Data)
 }
 ```
+
+Token kinds: `muon.TokenString`, `TokenInt`, `TokenFloat`, `TokenNil`,
+`TokenTrue`, `TokenFalse`, `TokenListStart`, `TokenListEnd`, `TokenDictStart`,
+`TokenDictEnd`, `TokenTypedArray`, `TokenMagic`, `TokenCount`.
 
 ## Options
 
@@ -101,6 +119,16 @@ enc.WriteWithMagic(&buf, value) // prepends 0x8F µ01
 enc.WritePadding(&buf, 4) // writes 4 × 0xFF
 ```
 
+### Chunked TypedArray
+
+For streaming numeric data, write a chunked TypedArray using one of the `TypeByte*` constants:
+
+```go
+enc.WriteChunkedTypedArray(&buf, muon.TypeByteInt32, []int32{1, 2}, []int32{3, 4})
+```
+
+The reader merges all chunks into a single `[]int32`.
+
 ## Custom marshaling
 
 Implement `Marshaler` or `MarshalerStream` for custom encoding:
@@ -112,6 +140,17 @@ func (m MyType) MarshalMuon() ([]byte, error) {
     // return raw muon bytes
 }
 ```
+
+## Error handling
+
+Encoding and decoding functions return `error`.
+
+`Unmarshal` and `Decoder.Unmarshal` may return `MuonError` with a `Code` field
+(`ErrCodeInvalidTarget`, `ErrCodeTypeMismatch`, `ErrCodeUnexpectedToken`).
+
+Streaming APIs may also return standard errors such as `io.EOF`, and the
+encoder/reader may return ordinary `fmt`-style errors for unsupported values or
+malformed input.
 
 ## Specification
 

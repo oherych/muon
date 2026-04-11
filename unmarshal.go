@@ -3,20 +3,22 @@ package muon
 import (
 	"fmt"
 	"reflect"
+
+	"github.com/oherych/muon/internal"
 )
 
 // Unmarshal decodes the muon-encoded data into the value pointed to by target.
 // target must be a non-nil pointer. Supported target types mirror the encoding
 // side: bool, all int/uint/float sizes, string, slice, array, map, struct, and
-// pointer. Use *interface{} to decode any value without a known schema.
-func Unmarshal(data []byte, target interface{}) error {
+// pointer. Use *any to decode any value without a known schema.
+func Unmarshal(data []byte, target any) error {
 	d := NewDecoder(data)
 	return d.Unmarshal(target)
 }
 
 // Unmarshal reads the next value from the stream and stores it into target.
 // target must be a non-nil pointer.
-func (d *Decoder) Unmarshal(target interface{}) error {
+func (d *Decoder) Unmarshal(target any) error {
 	rv := reflect.ValueOf(target)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
 		return errInvalidTarget("target must be a non-nil pointer")
@@ -39,7 +41,7 @@ func (d *Decoder) unmarshalToken(tok Token, v reflect.Value) error {
 	}
 
 	// nil token → zero the target
-	if tok.A == tokenNil {
+	if tok.A == TokenNil {
 		v.Set(reflect.Zero(v.Type()))
 		return nil
 	}
@@ -52,7 +54,7 @@ func (d *Decoder) unmarshalToken(tok Token, v reflect.Value) error {
 		return d.unmarshalToken(tok, v.Elem())
 	}
 
-	// interface{}: use the high-level tokenToValue path
+	// any: use the high-level tokenToValue path
 	if v.Kind() == reflect.Interface {
 		val, err := d.tokenToValue(tok)
 		if err != nil {
@@ -67,9 +69,9 @@ func (d *Decoder) unmarshalToken(tok Token, v reflect.Value) error {
 	}
 
 	switch tok.A {
-	case tokenTrue, tokenFalse:
+	case TokenTrue, TokenFalse:
 		return d.unmarshalBool(tok, v)
-	case tokenInt:
+	case TokenInt:
 		return d.unmarshalInt(tok, v)
 	case TokenFloat:
 		return d.unmarshalFloat(tok, v)
@@ -77,9 +79,9 @@ func (d *Decoder) unmarshalToken(tok Token, v reflect.Value) error {
 		return d.unmarshalString(tok, v)
 	case TokenTypedArray:
 		return d.unmarshalTypedArray(tok, v)
-	case tokenListStart:
+	case TokenListStart:
 		return d.unmarshalList(v)
-	case tokenDictStart:
+	case TokenDictStart:
 		return d.unmarshalDict(v)
 	default:
 		return errUnexpectedToken(tok.A)
@@ -90,7 +92,7 @@ func (d *Decoder) unmarshalBool(tok Token, v reflect.Value) error {
 	if v.Kind() != reflect.Bool {
 		return errTypeMismatch(tok.A, v.Interface())
 	}
-	v.SetBool(tok.A == tokenTrue)
+	v.SetBool(tok.A == TokenTrue)
 	return nil
 }
 
@@ -175,7 +177,7 @@ func (d *Decoder) unmarshalList(v reflect.Value) error {
 			if err != nil {
 				return err
 			}
-			if tok.A == tokenListEnd {
+			if tok.A == TokenListEnd {
 				break
 			}
 			elem := reflect.New(elemType).Elem()
@@ -192,7 +194,7 @@ func (d *Decoder) unmarshalList(v reflect.Value) error {
 			if err != nil {
 				return err
 			}
-			if tok.A == tokenListEnd {
+			if tok.A == TokenListEnd {
 				break
 			}
 			if i < v.Len() {
@@ -204,7 +206,7 @@ func (d *Decoder) unmarshalList(v reflect.Value) error {
 		}
 		return nil
 	}
-	return errTypeMismatch(tokenListStart, v.Interface())
+	return errTypeMismatch(TokenListStart, v.Interface())
 }
 
 func (d *Decoder) unmarshalDict(v reflect.Value) error {
@@ -214,7 +216,7 @@ func (d *Decoder) unmarshalDict(v reflect.Value) error {
 	case reflect.Map:
 		return d.unmarshalMap(v)
 	}
-	return errTypeMismatch(tokenDictStart, v.Interface())
+	return errTypeMismatch(TokenDictStart, v.Interface())
 }
 
 func (d *Decoder) unmarshalStruct(v reflect.Value) error {
@@ -226,21 +228,11 @@ func (d *Decoder) unmarshalStruct(v reflect.Value) error {
 		if !tf.IsExported() {
 			continue
 		}
-		name := tf.Name
-		if tag, ok := tf.Tag.Lookup("muon"); ok {
-			if tag == "-" {
-				continue
-			}
-			if tag != "" {
-				name = tag
-			}
-		} else {
-			// default: lowercase field name (mirrors writeStruct behaviour)
-			if len(name) > 0 {
-				name = string([]byte{name[0] | 0x20}) + name[1:]
-			}
+		info := internal.ParseTags(tf)
+		if info.Skip {
+			continue
 		}
-		fields[name] = i
+		fields[info.Name] = i
 	}
 
 	for {
@@ -248,7 +240,7 @@ func (d *Decoder) unmarshalStruct(v reflect.Value) error {
 		if err != nil {
 			return err
 		}
-		if keyTok.A == tokenDictEnd {
+		if keyTok.A == TokenDictEnd {
 			return nil
 		}
 		if keyTok.A != TokenString {
@@ -298,12 +290,12 @@ func (d *Decoder) unmarshalMap(v reflect.Value) error {
 		if err != nil {
 			return err
 		}
-		if keyTok.A == tokenDictEnd {
+		if keyTok.A == TokenDictEnd {
 			return nil
 		}
 
 		// remember int key type for subsequent keys
-		if keyTok.A == tokenInt && intKeyType == 0 {
+		if keyTok.A == TokenInt && intKeyType == 0 {
 			intKeyType = d.r.lastIntKeyType
 		}
 
@@ -331,29 +323,29 @@ func (d *Decoder) skipValue() error {
 		return err
 	}
 	switch tok.A {
-	case tokenListStart:
+	case TokenListStart:
 		depth := 1
 		for depth > 0 {
 			t, err := d.r.Next()
 			if err != nil {
 				return err
 			}
-			if t.A == tokenListStart {
+			if t.A == TokenListStart {
 				depth++
-			} else if t.A == tokenListEnd {
+			} else if t.A == TokenListEnd {
 				depth--
 			}
 		}
-	case tokenDictStart:
+	case TokenDictStart:
 		depth := 1
 		for depth > 0 {
 			t, err := d.r.Next()
 			if err != nil {
 				return err
 			}
-			if t.A == tokenDictStart {
+			if t.A == TokenDictStart {
 				depth++
-			} else if t.A == tokenDictEnd {
+			} else if t.A == TokenDictEnd {
 				depth--
 			}
 		}
@@ -361,7 +353,7 @@ func (d *Decoder) skipValue() error {
 	return nil
 }
 
-func toInt64(v interface{}) (int64, error) {
+func toInt64(v any) (int64, error) {
 	switch n := v.(type) {
 	case int:
 		return int64(n), nil
@@ -373,7 +365,7 @@ func toInt64(v interface{}) (int64, error) {
 	return 0, fmt.Errorf("cannot convert %T to int64", v)
 }
 
-func toUint64(v interface{}) (uint64, error) {
+func toUint64(v any) (uint64, error) {
 	switch n := v.(type) {
 	case int:
 		return uint64(n), nil
