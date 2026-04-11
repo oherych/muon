@@ -10,15 +10,15 @@ import (
 // Unmarshal decodes the muon-encoded data into the value pointed to by target.
 // target must be a non-nil pointer. Supported target types mirror the encoding
 // side: bool, all int/uint/float sizes, string, slice, array, map, struct, and
-// pointer. Use *any to decode any value without a known schema.
-func Unmarshal(data []byte, target any) error {
+// pointer. Use *interface{} to decode interface{} value without a known schema.
+func Unmarshal(data []byte, target interface{}) error {
 	d := NewDecoder(data)
 	return d.Unmarshal(target)
 }
 
 // Unmarshal reads the next value from the stream and stores it into target.
 // target must be a non-nil pointer.
-func (d *Decoder) Unmarshal(target any) error {
+func (d *Decoder) Unmarshal(target interface{}) error {
 	rv := reflect.ValueOf(target)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
 		return errInvalidTarget("target must be a non-nil pointer")
@@ -54,7 +54,7 @@ func (d *Decoder) unmarshalToken(tok Token, v reflect.Value) error {
 		return d.unmarshalToken(tok, v.Elem())
 	}
 
-	// any: use the high-level tokenToValue path
+	// interface{}: use the high-level tokenToValue path
 	if v.Kind() == reflect.Interface {
 		val, err := d.tokenToValue(tok)
 		if err != nil {
@@ -353,7 +353,7 @@ func (d *Decoder) skipValue() error {
 	return nil
 }
 
-func toInt64(v any) (int64, error) {
+func toInt64(v interface{}) (int64, error) {
 	switch n := v.(type) {
 	case int:
 		return int64(n), nil
@@ -365,7 +365,7 @@ func toInt64(v any) (int64, error) {
 	return 0, fmt.Errorf("cannot convert %T to int64", v)
 }
 
-func toUint64(v any) (uint64, error) {
+func toUint64(v interface{}) (uint64, error) {
 	switch n := v.(type) {
 	case int:
 		return uint64(n), nil

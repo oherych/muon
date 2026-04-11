@@ -35,7 +35,7 @@ func FuzzFloat64(f *testing.F) {
 	f.Fuzz(func(t *testing.T, in float64) { fuzzRoundTrip(t, in) })
 }
 
-func fuzzRoundTrip[T any](t *testing.T, in T) {
+func fuzzRoundTrip[T interface{}](t *testing.T, in T) {
 	t.Helper()
 	var buf bytes.Buffer
 	var enc Encoder
@@ -54,7 +54,7 @@ func fuzzRoundTrip[T any](t *testing.T, in T) {
 	}
 }
 
-func marshalBytes(v any) ([]byte, error) {
+func marshalBytes(v interface{}) ([]byte, error) {
 	var buf bytes.Buffer
 	var enc Encoder
 	err := enc.Write(&buf, v)

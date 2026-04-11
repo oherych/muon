@@ -55,7 +55,7 @@ func TestUnmarshal_Primitives(t *testing.T) {
 		assert.Equal(t, "hello", v)
 	})
 	t.Run("nil_into_interface", func(t *testing.T) {
-		var v any
+		var v interface{}
 		require.NoError(t, Unmarshal(encode(t, nil), &v))
 		assert.Nil(t, v)
 	})
@@ -131,7 +131,7 @@ func TestUnmarshal_Map(t *testing.T) {
 }
 
 func TestUnmarshal_Slice(t *testing.T) {
-	data := encode(t, []any{"x", "y", "z"})
+	data := encode(t, []interface{}{"x", "y", "z"})
 	var out []string
 	require.NoError(t, Unmarshal(data, &out))
 	assert.Equal(t, []string{"x", "y", "z"}, out)
@@ -160,10 +160,10 @@ func TestUnmarshal_Pointer(t *testing.T) {
 }
 
 func TestUnmarshal_Interface(t *testing.T) {
-	data := encode(t, []any{"a", 1, true})
-	var out any
+	data := encode(t, []interface{}{"a", 1, true})
+	var out interface{}
 	require.NoError(t, Unmarshal(data, &out))
-	assert.Equal(t, []any{"a", 1, true}, out)
+	assert.Equal(t, []interface{}{"a", 1, true}, out)
 }
 
 func TestUnmarshal_MagicTransparent(t *testing.T) {
@@ -234,7 +234,7 @@ func TestUnmarshal_SkipNestedValue(t *testing.T) {
 
 func TestUnmarshal_EmptySlice(t *testing.T) {
 	var out []string
-	require.NoError(t, Unmarshal(encode(t, []any{}), &out))
+	require.NoError(t, Unmarshal(encode(t, []interface{}{}), &out))
 	assert.Empty(t, out)
 }
 

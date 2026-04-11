@@ -18,7 +18,7 @@ import (
 // Helpers
 // ---------------------------------------------------------------------------
 
-func encode(t *testing.T, v any) []byte {
+func encode(t *testing.T, v interface{}) []byte {
 	t.Helper()
 	var buf bytes.Buffer
 	var enc Encoder
@@ -26,7 +26,7 @@ func encode(t *testing.T, v any) []byte {
 	return buf.Bytes()
 }
 
-func encodeWith(t *testing.T, enc *Encoder, v any) []byte {
+func encodeWith(t *testing.T, enc *Encoder, v interface{}) []byte {
 	t.Helper()
 	var buf bytes.Buffer
 	require.NoError(t, enc.Write(&buf, v))
@@ -300,7 +300,7 @@ func TestSpec_Special_Null(t *testing.T) {
 func TestSpec_TypedArray_AllIntTypes(t *testing.T) {
 	cases := []struct {
 		name string
-		v    any
+		v    interface{}
 		tb   byte
 	}{
 		{"int8", []int8{1, 2, 3}, typeInt8},
@@ -354,12 +354,12 @@ func TestSpec_TypedArray_Empty(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSpec_List_Empty(t *testing.T) {
-	data := encode(t, []any{})
+	data := encode(t, []interface{}{})
 	assert.Equal(t, []byte{listStart, listEnd}, data)
 }
 
 func TestSpec_List_Mixed(t *testing.T) {
-	data := encode(t, []any{"a", 1, true, nil})
+	data := encode(t, []interface{}{"a", 1, true, nil})
 	toks := tokens(t, data)
 	assert.Equal(t, TokenListStart, toks[0].A)
 	assert.Equal(t, TokenString, toks[1].A)
@@ -370,7 +370,7 @@ func TestSpec_List_Mixed(t *testing.T) {
 }
 
 func TestSpec_List_Nested(t *testing.T) {
-	data := encode(t, []any{[]any{}, []any{}})
+	data := encode(t, []interface{}{[]interface{}{}, []interface{}{}})
 	toks := tokens(t, data)
 	// outer [ inner[] inner[] ]
 	assert.Equal(t, TokenListStart, toks[0].A)
@@ -391,7 +391,7 @@ func TestSpec_Dict_Empty(t *testing.T) {
 }
 
 func TestSpec_Dict_StringKeys(t *testing.T) {
-	data := encode(t, map[string]any{"key": "val"})
+	data := encode(t, map[string]interface{}{"key": "val"})
 	toks := tokens(t, data)
 	assert.Equal(t, TokenDictStart, toks[0].A)
 	assert.Equal(t, TokenString, toks[1].A)
@@ -425,9 +425,9 @@ func TestSpec_Dict_IntKeys_SLEB128(t *testing.T) {
 }
 
 func TestSpec_Dict_MixedKeyTypes_Error(t *testing.T) {
-	// map[any]any allows mixing key types at runtime.
+	// map[interface{}]interface{} allows mixing key types at runtime.
 	// Spec: all keys must be the same type — encoder must return an error.
-	m := map[any]any{
+	m := map[interface{}]interface{}{
 		"string_key": "v1",
 		42:           "v2",
 	}
@@ -558,7 +558,7 @@ func TestSpec_Tag_Count_Decoder_Transparent(t *testing.T) {
 	d := NewDecoder(data)
 	v, err := d.Decode()
 	require.NoError(t, err)
-	assert.Equal(t, []any{1, 2, 3}, v)
+	assert.Equal(t, []interface{}{1, 2, 3}, v)
 }
 
 func TestSpec_Tag_Size_String(t *testing.T) {
@@ -616,7 +616,7 @@ func TestSpec_Deterministic_IntKeys_Sorted(t *testing.T) {
 	v, err := d.Decode()
 	require.NoError(t, err)
 
-	result := v.(map[any]any)
+	result := v.(map[interface{}]interface{})
 	assert.Equal(t, "a", result[10])
 	assert.Equal(t, "b", result[20])
 	assert.Equal(t, "c", result[30])
@@ -738,25 +738,25 @@ func TestSpec_Chaining_MagicMidStream(t *testing.T) {
 }
 
 func TestSpec_Decoder_NestedList(t *testing.T) {
-	data := encode(t, []any{[]any{"x"}, []any{"y"}})
+	data := encode(t, []interface{}{[]interface{}{"x"}, []interface{}{"y"}})
 	d := NewDecoder(data)
 	v, err := d.Decode()
 	require.NoError(t, err)
-	outer := v.([]any)
+	outer := v.([]interface{})
 	require.Len(t, outer, 2)
-	assert.Equal(t, "x", outer[0].([]any)[0])
+	assert.Equal(t, "x", outer[0].([]interface{})[0])
 }
 
 func TestSpec_Decoder_NestedDict(t *testing.T) {
 	enc := &Encoder{Deterministic: true}
-	data := encodeWith(t, enc, map[string]any{
-		"inner": map[string]any{"k": "v"},
+	data := encodeWith(t, enc, map[string]interface{}{
+		"inner": map[string]interface{}{"k": "v"},
 	})
 	d := NewDecoder(data)
 	v, err := d.Decode()
 	require.NoError(t, err)
-	outer := v.(map[string]any)
-	inner := outer["inner"].(map[string]any)
+	outer := v.(map[string]interface{})
+	inner := outer["inner"].(map[string]interface{})
 	assert.Equal(t, "v", inner["k"])
 }
 
@@ -838,7 +838,7 @@ func TestSpec_MarshalerStream_Interface(t *testing.T) {
 func TestSpec_ReadTypedElems_AllTypes(t *testing.T) {
 	cases := []struct {
 		name string
-		v    any
+		v    interface{}
 	}{
 		{"int8", []int8{-4, -3, -2, -1, 0, 1, 2, 3, 4}},
 		{"int16", []int16{-4, -3, -2, -1, 0, 1, 2, 3, 4}},
@@ -870,19 +870,19 @@ func TestSpec_MergeTypedSlices_AllTypes(t *testing.T) {
 	cases := []struct {
 		name     string
 		typeByte byte
-		chunks   []any
-		want     any
+		chunks   []interface{}
+		want     interface{}
 	}{
-		{"int8", typeInt8, []any{[]int8{1, 2}, []int8{3, 4}}, []int8{1, 2, 3, 4}},
-		{"int16", typeInt16, []any{[]int16{1, 2}, []int16{3, 4}}, []int16{1, 2, 3, 4}},
-		{"int32", typeInt32, []any{[]int32{1, 2}, []int32{3, 4}}, []int32{1, 2, 3, 4}},
-		{"int64", typeInt64, []any{[]int64{1, 2}, []int64{3, 4}}, []int64{1, 2, 3, 4}},
-		{"uint8", typeUint8, []any{[]uint8{1, 2}, []uint8{3, 4}}, []uint8{1, 2, 3, 4}},
-		{"uint16", typeUint16, []any{[]uint16{1, 2}, []uint16{3, 4}}, []uint16{1, 2, 3, 4}},
-		{"uint32", typeUint32, []any{[]uint32{1, 2}, []uint32{3, 4}}, []uint32{1, 2, 3, 4}},
-		{"uint64", typeUint64, []any{[]uint64{1, 2}, []uint64{3, 4}}, []uint64{1, 2, 3, 4}},
-		{"float32", typeFloat32, []any{[]float32{1.5, 2.5}, []float32{3.5}}, []float32{1.5, 2.5, 3.5}},
-		{"float64", typeFloat64, []any{[]float64{1.5, 2.5}, []float64{3.5}}, []float64{1.5, 2.5, 3.5}},
+		{"int8", typeInt8, []interface{}{[]int8{1, 2}, []int8{3, 4}}, []int8{1, 2, 3, 4}},
+		{"int16", typeInt16, []interface{}{[]int16{1, 2}, []int16{3, 4}}, []int16{1, 2, 3, 4}},
+		{"int32", typeInt32, []interface{}{[]int32{1, 2}, []int32{3, 4}}, []int32{1, 2, 3, 4}},
+		{"int64", typeInt64, []interface{}{[]int64{1, 2}, []int64{3, 4}}, []int64{1, 2, 3, 4}},
+		{"uint8", typeUint8, []interface{}{[]uint8{1, 2}, []uint8{3, 4}}, []uint8{1, 2, 3, 4}},
+		{"uint16", typeUint16, []interface{}{[]uint16{1, 2}, []uint16{3, 4}}, []uint16{1, 2, 3, 4}},
+		{"uint32", typeUint32, []interface{}{[]uint32{1, 2}, []uint32{3, 4}}, []uint32{1, 2, 3, 4}},
+		{"uint64", typeUint64, []interface{}{[]uint64{1, 2}, []uint64{3, 4}}, []uint64{1, 2, 3, 4}},
+		{"float32", typeFloat32, []interface{}{[]float32{1.5, 2.5}, []float32{3.5}}, []float32{1.5, 2.5, 3.5}},
+		{"float64", typeFloat64, []interface{}{[]float64{1.5, 2.5}, []float64{3.5}}, []float64{1.5, 2.5, 3.5}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -965,7 +965,7 @@ func TestSpec_Float16_Negative(t *testing.T) {
 func TestSpec_DictKey_AllIntTypes(t *testing.T) {
 	cases := []struct {
 		name    string
-		m       any
+		m       interface{}
 		keyByte byte
 	}{
 		{"uint8", map[uint8]string{1: "a"}, typeUint8},
@@ -989,7 +989,7 @@ func TestSpec_DictKey_AllIntTypes(t *testing.T) {
 			d := NewDecoder(data)
 			v, err := d.Decode()
 			require.NoError(t, err)
-			result := v.(map[any]any)
+			result := v.(map[interface{}]interface{})
 			assert.Len(t, result, 1)
 		})
 	}
@@ -1004,7 +1004,7 @@ func TestSpec_DictKey_MultipleIntKeys_SLEB128(t *testing.T) {
 	d := NewDecoder(data)
 	v, err := d.Decode()
 	require.NoError(t, err)
-	result := v.(map[any]any)
+	result := v.(map[interface{}]interface{})
 	assert.Len(t, result, 3)
 	assert.Equal(t, "a", result[10])
 	assert.Equal(t, "b", result[20])
@@ -1026,8 +1026,8 @@ func TestSpec_WriteMap_UnsupportedKeyType(t *testing.T) {
 }
 
 func TestSpec_WriteMap_MixedKeyTypes(t *testing.T) {
-	// map[any]any with mixed string/int keys must error
-	m := map[any]any{
+	// map[interface{}]interface{} with mixed string/int keys must error
+	m := map[interface{}]interface{}{
 		"string_key": "v1",
 		42:           "v2",
 	}
@@ -1058,7 +1058,7 @@ func TestSpec_Decoder_EmptyDict(t *testing.T) {
 	d := NewDecoder(data)
 	v, err := d.Decode()
 	require.NoError(t, err)
-	assert.Equal(t, map[string]any{}, v)
+	assert.Equal(t, map[string]interface{}{}, v)
 }
 
 func TestSpec_Decoder_UnexpectedToken(t *testing.T) {
@@ -1081,7 +1081,7 @@ func TestSpec_Decoder_Float(t *testing.T) {
 
 func TestSpec_Decoder_TypedArrayAllTypes(t *testing.T) {
 	cases := []struct {
-		v any
+		v interface{}
 	}{
 		{[]int8{1, 2, 3}},
 		{[]int16{1, 2, 3}},

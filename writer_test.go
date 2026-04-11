@@ -15,7 +15,7 @@ var (
 	testString = "test"
 
 	tests = map[string]struct {
-		golang  any
+		golang  interface{}
 		encoded []byte
 		tokens  []Token
 	}{
@@ -88,7 +88,7 @@ var (
 		"uint64": {golang: uint64(64), encoded: []byte{0xbb, 0xc0, 0x00}, tokens: []Token{{A: TokenInt, Data: 64}}},
 
 		"slice": {
-			golang:  []any{testString, true},
+			golang:  []interface{}{testString, true},
 			encoded: []byte{listStart, 0x74, 0x65, 0x73, 0x74, stringEnd, boolTrue, listEnd},
 			tokens:  []Token{{A: TokenListStart}, {A: TokenString, Data: testString}, {A: TokenTrue}, {A: TokenListEnd}},
 		},
@@ -226,7 +226,7 @@ func TestLRUStringRefs(t *testing.T) {
 	enc := Encoder{LRU: true}
 
 	// write two values referencing the same strings
-	err := enc.Write(&buf, []any{"foo", "bar", "foo"})
+	err := enc.Write(&buf, []interface{}{"foo", "bar", "foo"})
 	assert.Nil(t, err)
 
 	// first "foo": 0x8C tag + "foo\x00"
@@ -405,22 +405,22 @@ func TestDecoder(t *testing.T) {
 	t.Run("list", func(t *testing.T) {
 		var buf bytes.Buffer
 		var enc Encoder
-		// use []any to avoid TypedArray path
-		enc.Write(&buf, []any{"a", "b"})
+		// use []interface{} to avoid TypedArray path
+		enc.Write(&buf, []interface{}{"a", "b"})
 		d := NewDecoder(buf.Bytes())
 		v, err := d.Decode()
 		assert.Nil(t, err)
-		assert.Equal(t, []any{"a", "b"}, v)
+		assert.Equal(t, []interface{}{"a", "b"}, v)
 	})
 
 	t.Run("dict", func(t *testing.T) {
 		var buf bytes.Buffer
 		enc := Encoder{Deterministic: true}
-		enc.Write(&buf, map[string]any{"x": 1})
+		enc.Write(&buf, map[string]interface{}{"x": 1})
 		d := NewDecoder(buf.Bytes())
 		v, err := d.Decode()
 		assert.Nil(t, err)
-		assert.Equal(t, map[string]any{"x": 1}, v)
+		assert.Equal(t, map[string]interface{}{"x": 1}, v)
 	})
 
 	t.Run("chaining", func(t *testing.T) {

@@ -15,7 +15,7 @@ go get github.com/oherych/muon
 ```go
 var buf bytes.Buffer
 enc := muon.Encoder{}
-enc.Write(&buf, map[string]any{
+enc.Write(&buf, map[string]interface{}{
     "name": "Alice",
     "age":  30,
 })
@@ -57,17 +57,17 @@ for {
 }
 ```
 
-| muon type | Go value |
-|---|---|
-| string | `string` |
-| integer | `int`, `int64`, or `uint64` |
-| float | `float64` |
-| true / false | `bool` |
-| null | `nil` |
-| TypedArray | `[]int8`, `[]float64`, etc. |
-| list | `[]any` |
-| dict (string keys) | `map[string]any` |
-| dict (integer keys) | `map[any]any` |
+| muon type           | Go value                      |
+|---------------------|-------------------------------|
+| string              | `string`                      |
+| integer             | `int`, `int64`, or `uint64`   |
+| float               | `float64`                     |
+| true / false        | `bool`                        |
+| null                | `nil`                         |
+| TypedArray          | `[]int8`, `[]float64`, etc.   |
+| list                | `[]interface{}`               |
+| dict (string keys)  | `map[string]interface{}`      |
+| dict (integer keys) | `map[interface{}]interface{}` |
 
 ### Low-level token reader
 
