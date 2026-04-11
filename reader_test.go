@@ -1,9 +1,10 @@
 package muon
 
 import (
-	"github.com/stretchr/testify/assert"
 	"io"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewReader(t *testing.T) {
