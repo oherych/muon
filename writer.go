@@ -60,7 +60,7 @@ type Encoder struct {
 // slice, array, map (string or integer keys), struct, and pointer.
 // Types implementing [Marshaler] or [MarshalerStream] are encoded via those
 // interfaces. Returns an error for unsupported types or write failures.
-func (e *Encoder) Write(w io.Writer, in any) error {
+func (e *Encoder) Write(w io.Writer, in interface{}) error {
 	return e.write(w, in)
 }
 
@@ -69,7 +69,7 @@ var magic = []byte{tagMagicByte, 0xB5, 0x30, 0x31}
 // WriteWithMagic prepends the muon file signature (0x8F µ01) and then writes
 // the encoded value. Use this at the start of a file or stream so readers can
 // reliably detect the muon format.
-func (e *Encoder) WriteWithMagic(w io.Writer, in any) error {
+func (e *Encoder) WriteWithMagic(w io.Writer, in interface{}) error {
 	if err := e.writeBytes(w, magic); err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func (e *Encoder) WritePadding(w io.Writer, n int) error {
 // typeByte must be one of the [TypeByteInt8]…[TypeByteFloat64] constants.
 // Each chunk must be a slice whose element kind matches typeByte.
 // The reader reassembles all chunks into a single typed slice.
-func (e *Encoder) WriteChunkedTypedArray(w io.Writer, typeByte byte, chunks ...any) error {
+func (e *Encoder) WriteChunkedTypedArray(w io.Writer, typeByte byte, chunks ...interface{}) error {
 	if err := e.writeBytes(w, []byte{typedArrayChunk, typeByte}); err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func (e *Encoder) WriteChunkedTypedArray(w io.Writer, typeByte byte, chunks ...a
 	return e.writeBytes(w, []byte{0x00})
 }
 
-func (e *Encoder) write(w io.Writer, in any) error {
+func (e *Encoder) write(w io.Writer, in interface{}) error {
 	if m, ok := in.(Marshaler); ok {
 		data, err := m.MarshalMuon()
 		if err != nil {

@@ -11,7 +11,7 @@
 //
 //	var buf bytes.Buffer
 //	enc := muon.Encoder{}
-//	enc.Write(&buf, map[string]any{
+//	enc.Write(&buf, map[string]interface{}{
 //	    "name": "Alice",
 //	    "age":  30,
 //	})
@@ -53,9 +53,9 @@
 //	true / false    → bool
 //	null            → nil
 //	TypedArray      → []int8, []float64, etc.
-//	list            → []any
-//	dict (str keys) → map[string]any
-//	dict (int keys) → map[any]any
+//	list            → []interface{}
+//	dict (str keys) → map[string]interface{}
+//	dict (int keys) → map[interface{}]interface{}
 //
 // # Options
 //

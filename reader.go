@@ -25,7 +25,7 @@ type Reader struct {
 // tokens that carry no payload, such as list/dict delimiters).
 type Token struct {
 	A    TokenEnum
-	Data any
+	Data interface{}
 }
 
 // NewByteReader creates a Reader that decodes from the given byte slice.
@@ -245,7 +245,7 @@ func (r *Reader) Next() (Token, error) {
 	return Token{}, io.EOF
 }
 
-func (r *Reader) readTypedElems(typeByte byte, count int) (any, error) {
+func (r *Reader) readTypedElems(typeByte byte, count int) (interface{}, error) {
 	read := func(n int) ([]byte, error) {
 		end := r.scanp + n*count
 		if end > len(r.in) {
@@ -359,9 +359,9 @@ func (r *Reader) readTypedElems(typeByte byte, count int) (any, error) {
 	return nil, fmt.Errorf("unknown typed array type byte: 0x%02X", typeByte)
 }
 
-func (r *Reader) readChunkedTypedElems(typeByte byte) (any, error) {
+func (r *Reader) readChunkedTypedElems(typeByte byte) (interface{}, error) {
 	// read chunks until zero-length terminator, aggregate into one slice
-	var allElems []any
+	var allElems []interface{}
 	for {
 		count, n := leb128.DecodeUleb128(r.in[r.scanp:])
 		r.scanp += int(n)
@@ -380,7 +380,7 @@ func (r *Reader) readChunkedTypedElems(typeByte byte) (any, error) {
 	return mergeTypedSlices(allElems), nil
 }
 
-func mergeTypedSlices(chunks []any) any {
+func mergeTypedSlices(chunks []interface{}) interface{} {
 	switch chunks[0].(type) {
 	case []int8:
 		var out []int8

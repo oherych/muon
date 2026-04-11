@@ -30,7 +30,7 @@ func errInvalidTarget(msg string) error {
 	return MuonError{Code: ErrCodeInvalidTarget, Msg: msg}
 }
 
-func errTypeMismatch(token TokenEnum, target any) error {
+func errTypeMismatch(token TokenEnum, target interface{}) error {
 	return MuonError{Code: ErrCodeTypeMismatch, Msg: fmt.Sprintf("cannot assign %s token to %T", token, target)}
 }
 

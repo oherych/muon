@@ -16,7 +16,7 @@ func NewDecoder(data []byte) *Decoder {
 
 // Decode reads the next value from the stream and returns it as a Go value.
 // Returns io.EOF when the stream is exhausted.
-func (d *Decoder) Decode() (any, error) {
+func (d *Decoder) Decode() (interface{}, error) {
 	tok, err := d.r.Next()
 	if err != nil {
 		return nil, err
@@ -24,7 +24,7 @@ func (d *Decoder) Decode() (any, error) {
 	return d.tokenToValue(tok)
 }
 
-func (d *Decoder) tokenToValue(tok Token) (any, error) {
+func (d *Decoder) tokenToValue(tok Token) (interface{}, error) {
 	switch tok.A {
 	case TokenMagic, TokenCount:
 		// skip transparent tokens and read the actual value
@@ -62,8 +62,8 @@ func (d *Decoder) tokenToValue(tok Token) (any, error) {
 	}
 }
 
-func (d *Decoder) readList() ([]any, error) {
-	var out []any
+func (d *Decoder) readList() ([]interface{}, error) {
+	var out []interface{}
 	for {
 		tok, err := d.r.Next()
 		if err != nil {
@@ -80,14 +80,14 @@ func (d *Decoder) readList() ([]any, error) {
 	}
 }
 
-func (d *Decoder) readDict() (any, error) {
+func (d *Decoder) readDict() (interface{}, error) {
 	// peek at first key to decide string vs integer dict
 	keyTok, err := d.r.Next()
 	if err != nil {
 		return nil, err
 	}
 	if keyTok.A == TokenDictEnd {
-		return map[string]any{}, nil
+		return map[string]interface{}{}, nil
 	}
 
 	if keyTok.A == TokenString {
@@ -99,8 +99,8 @@ func (d *Decoder) readDict() (any, error) {
 	return nil, io.ErrUnexpectedEOF
 }
 
-func (d *Decoder) readStringDict(firstKey Token) (map[string]any, error) {
-	out := make(map[string]any)
+func (d *Decoder) readStringDict(firstKey Token) (map[string]interface{}, error) {
+	out := make(map[string]interface{})
 	keyTok := firstKey
 	for {
 		key := keyTok.Data.(string)
@@ -124,8 +124,8 @@ func (d *Decoder) readStringDict(firstKey Token) (map[string]any, error) {
 	}
 }
 
-func (d *Decoder) readIntDict(firstKey Token) (map[any]any, error) {
-	out := make(map[any]any)
+func (d *Decoder) readIntDict(firstKey Token) (map[interface{}]interface{}, error) {
+	out := make(map[interface{}]interface{})
 	intKeyType := d.r.lastIntKeyType
 	keyTok := firstKey
 	for {
